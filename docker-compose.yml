@@ -1,0 +1,23 @@
+services:
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        VITE_USE_MOCK: ${VITE_USE_MOCK:-true}
+        VITE_API_BASE_URL: ${VITE_API_BASE_URL:-}
+    ports:
+      - "${PORT:-3000}:3000"
+    environment:
+      NODE_ENV: production
+      HOST: 0.0.0.0
+      PORT: 3000
+      # BFF (server-only): where the Express API lives, which origins may write, cookie mode.
+      API_UPSTREAM_URL: ${API_UPSTREAM_URL:-http://host.docker.internal:5000}
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-http://localhost:3000}
+      # false only because the local demo is plain http://localhost; use true behind HTTPS.
+      SESSION_COOKIE_SECURE: ${SESSION_COOKIE_SECURE:-false}
+      HOTEL_SLUG: ${HOTEL_SLUG:-}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    restart: unless-stopped

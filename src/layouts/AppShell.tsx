@@ -1,8 +1,10 @@
-import { Link, useRouterState } from "@tanstack/react-router";
+import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState, type ReactNode } from "react";
 import { Bell, ChevronLeft, ChevronRight, Hotel, LogOut, Menu, Search, X } from "lucide-react";
 import { navGroups, allNavItems } from "./nav";
 import { USE_MOCK } from "@/api/client";
+import { initials, logout, meQuery, roleLabel } from "@/api/auth.api";
 import { cn } from "@/lib/utils";
 
 function SidebarNav({ collapsed, onNavigate }: { collapsed: boolean; onNavigate?: () => void }) {
@@ -62,6 +64,26 @@ export function AppShell({ children }: { children: ReactNode }) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const current = allNavItems.find((i) => (i.to === "/" ? pathname === "/" : pathname.startsWith(i.to)));
+  const queryClient = useQueryClient();
+  const navigate = useNavigate();
+  const { data: user } = useQuery({ ...meQuery(), enabled: !USE_MOCK });
+  const [signingOut, setSigningOut] = useState(false);
+  const displayName = user ? (user.full_name ?? user.username) : "Front Desk";
+  const displayRole = user ? roleLabel(user.role) : "Front Desk";
+
+  async function onLogout() {
+    if (USE_MOCK || signingOut) return;
+    setSigningOut(true);
+    try {
+      await logout();
+    } catch {
+      // The cookie is HttpOnly; if the BFF call failed we still drop local state below.
+    } finally {
+      queryClient.clear();
+      setSigningOut(false);
+      await navigate({ to: "/login" });
+    }
+  }
 
   return (
     <div className="flex min-h-screen bg-background">
@@ -116,10 +138,18 @@ export function AppShell({ children }: { children: ReactNode }) {
               <span className="absolute right-2 top-2 size-2 rounded-full bg-primary" />
             </button>
             <div className="flex items-center gap-2 rounded-lg py-1 pl-1 pr-2">
-              <div className="grid size-8 place-items-center rounded-full bg-accent text-xs font-bold text-accent-foreground">FD</div>
-              <span className="hidden text-sm font-medium sm:block">Front Desk</span>
+              <div className="grid size-8 place-items-center rounded-full bg-accent text-xs font-bold text-accent-foreground">
+                {user ? initials(user.full_name, user.username) : "FD"}
+              </div>
+              <span className="hidden text-sm font-medium sm:block" title={displayRole}>{displayName}</span>
             </div>
-            <button className="rounded-lg p-2 text-muted-foreground hover:bg-muted" aria-label="Log out" title="Log out (connects to backend in Phase 4)">
+            <button
+              onClick={onLogout}
+              disabled={USE_MOCK || signingOut}
+              className="rounded-lg p-2 text-muted-foreground hover:bg-muted disabled:opacity-50"
+              aria-label="Log out"
+              title={USE_MOCK ? "Sign-out is available when connected to the hotel system" : "Log out"}
+            >
               <LogOut className="size-5" />
             </button>
           </div>

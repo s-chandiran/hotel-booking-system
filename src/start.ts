@@ -30,6 +30,10 @@ const csrfMiddleware = createCsrfMiddleware({
 // requireSupabaseAuth server functions need. Add it by hand only if Lovable Cloud or a
 // user-managed Supabase project is connected, no middleware here sets Authorization, and the
 // project did not intentionally replace it.
+// defaultSsr: false — this is a staff app behind login. Route loaders/beforeLoad run in the
+// browser only, so data is always fetched through the same-origin BFF with the session cookie
+// (never during SSR, where no browser cookie exists) and no per-user data is ever server-rendered.
 export const startInstance = createStart(() => ({
+  defaultSsr: false,
   requestMiddleware: [errorMiddleware, csrfMiddleware],
 }));
