@@ -9,6 +9,11 @@ lerna-debug.log*
 
 node_modules
 dist
+
+# Secrets (database and demo passwords). Only .env.example is committed.
+.env
+.env.*
+!.env.example
 dist-ssr
 .output
 .vinxi

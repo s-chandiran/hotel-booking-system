@@ -2,7 +2,7 @@
 import type { DashboardData, RoomStatus, RoomTile } from "@/types/dashboard";
 
 const types = ["Standard", "Deluxe", "Suite"];
-const pattern: RoomStatus[] = ["occupied", "available", "occupied", "reserved", "available", "occupied", "maintenance", "occupied", "available", "reserved"];
+const pattern: RoomStatus[] = ["occupied", "available", "occupied", "available", "available", "occupied", "maintenance", "occupied", "available", "available"];
 const rooms: RoomTile[] = [1, 2, 3, 4].flatMap((floor) =>
   Array.from({ length: 10 }, (_, i) => ({
     number: `${floor}${String(i + 1).padStart(2, "0")}`,
@@ -19,7 +19,6 @@ export const dashboardMock: DashboardData = {
     totalRooms: rooms.length,
     available: count("available"),
     occupied: count("occupied"),
-    reserved: count("reserved"),
     maintenance: count("maintenance"),
     checkInsToday: 6,
     checkOutsToday: 4,

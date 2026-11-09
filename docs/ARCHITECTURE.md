@@ -1,6 +1,12 @@
 # ARCHITECTURE.md — StayDesk frontend
 
-## Overview
+> **Current decision (2026-11-08): mock data only.** The app runs on sample data
+> (`VITE_USE_MOCK=true`, `src/api/mock`). There is no confirmed backend. `D:\projects\Hotel` is a
+> separate application and must not be used. The BFF below (Phase 1, commit `40ffacb`) stays in the
+> code but is inactive in mock mode. Its upstream contract (JWT login, `{ error: { code, message } }`)
+> was modelled on that other application: `TBD — needs confirmation` if a real backend is ever chosen.
+
+## Overview (BFF design, inactive in mock mode)
 
 ```
 Browser (React, TanStack Router/Query)
@@ -9,7 +15,7 @@ Browser (React, TanStack Router/Query)
 TanStack Start / Nitro server  (src/server.ts → src/server/bff)
    │  Authorization: Bearer <JWT from cookie>   (server-to-server)
    ▼
-Express API  (separate repo: D:\projects\Hotel\server) ──► MySQL 8
+Express API  (TBD — needs confirmation; NOT D:\projects\Hotel)
 ```
 
 - The Express backend is the source of truth for data, business rules and authentication.
@@ -65,4 +71,5 @@ put secrets there. BFF variables are read from the server process environment at
 
 - Login rate limiting in Express sees every user as the BFF's IP (`X-Forwarded-For` not set).
 - The page guard checks cookie presence only; validity is enforced on the first `/api` call.
-- List endpoints for invoices/payments and a guest list do not exist in the backend yet (Phase 4).
+- Backend-specific gaps from the Phase 1 analysis referred to `D:\projects\Hotel`, which is not our
+  backend; they no longer apply.

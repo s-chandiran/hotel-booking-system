@@ -5,7 +5,7 @@ import { DataTable, PageHeader, StatRow, inr } from "@/components/app/DataTable"
 import { StatusBadge, type Tone } from "@/components/app/StatusBadge";
 import type { Payment } from "@/types/modules";
 
-const tone: Record<Payment["status"], [Tone, string]> = { success: ["success", "Received"], pending: ["warning", "Pending"], refunded: ["info", "Refunded"], failed: ["danger", "Failed"] };
+const tone: Record<Payment["status"], [Tone, string]> = { success: ["success", "Received"], pending: ["warning", "Pending"], failed: ["danger", "Failed"] };
 
 export const Route = createFileRoute("/payments")({
   head: () => ({
@@ -26,7 +26,7 @@ function Page() {
   return (
     <div className="mx-auto max-w-[1400px] space-y-6">
       <PageHeader title="Payments" subtitle="Money received against invoices." />
-      <StatRow items={[{ label: "Transactions", value: data.length }, { label: "Received", value: sum("success") }, { label: "Pending", value: sum("pending") }, { label: "Refunded", value: sum("refunded") }]} />
+      <StatRow items={[{ label: "Transactions", value: data.length }, { label: "Received", value: sum("success") }, { label: "Pending", value: sum("pending") }, { label: "Refunded", value: inr(data.reduce((a, p) => a + (p.refundedAmount ?? 0), 0)) }]} />
       <DataTable rows={data} rowKey={(p) => p.id} searchText={(p) => `${p.reference} ${p.guestName} ${p.invoiceNumber} ${p.method}`} columns={[
         { header: "Reference", cell: (p) => <span className="font-medium">{p.reference}</span> },
         { header: "Guest", cell: (p) => p.guestName },

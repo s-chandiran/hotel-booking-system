@@ -3,15 +3,15 @@
 | Screen | Route | Doc | Data source |
 |---|---|---|---|
 | Sign in | `/login` | [login.md](login.md) | BFF `/bff/auth/*` |
-| Dashboard | `/` | TBD (Phase 3) | mock until Phase 3 |
-| Reservations | `/bookings` | TBD (Phase 3) | mock until Phase 3 |
-| Front Desk | `/front-desk` | TBD (Phase 5) | mock |
-| Rooms | `/rooms` | TBD (Phase 3) | mock |
-| Guests | `/guests` | TBD (Phase 4) | mock |
-| Invoices | `/invoices` | TBD (Phase 4) | mock |
-| Payments | `/payments` | TBD (Phase 4) | mock |
-| Reports | `/reports` | TBD (P2) | mock |
-| Settings | `/settings` | TBD (P2) | mock |
+| Dashboard | `/` | TBD | live API (`/api/dashboard`) when `VITE_USE_MOCK=false` |
+| Reservations | `/bookings` | [reservations.md](reservations.md) | live API, with the demo actions |
+| Front Desk | `/front-desk` | [reservations.md](reservations.md) | live API, with the demo actions |
+| Rooms | `/rooms` | TBD | live API, read only |
+| Guests | `/guests` | TBD | live API, read only |
+| Invoices | `/invoices` | TBD | live API, read only |
+| Payments | `/payments` | TBD | live API, read only |
+| Reports | `/reports` | TBD | live API, admin only (server-side 403 otherwise) |
+| Settings | `/settings` | TBD | live API, admin only (server-side 403 otherwise) |
 
 ## Shared navigation and session model
 

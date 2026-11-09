@@ -6,7 +6,7 @@ import { StatusBadge, type Tone } from "@/components/app/StatusBadge";
 import type { RoomStatus } from "@/types/dashboard";
 
 const tone: Record<RoomStatus, [Tone, string]> = {
-  available: ["success", "Available"], occupied: ["info", "Occupied"], reserved: ["warning", "Reserved"], maintenance: ["danger", "Maintenance"],
+  available: ["success", "Available"], occupied: ["info", "Occupied"], maintenance: ["danger", "Maintenance"],
 };
 const hk = { clean: ["success", "Clean"], dirty: ["danger", "Dirty"], inspecting: ["warning", "Inspecting"] } as const;
 

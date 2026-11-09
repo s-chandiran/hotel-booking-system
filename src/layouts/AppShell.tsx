@@ -125,7 +125,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             <Menu className="size-5" />
           </button>
           <div className="min-w-0">
-            <p className="truncate text-xs text-muted-foreground">Sample Property / {current?.label ?? "Page"}</p>
+            <p className="truncate text-xs text-muted-foreground">{USE_MOCK ? "Sample Property" : "StayDesk"} / {current?.label ?? "Page"}</p>
             <h1 className="truncate text-base font-semibold md:text-lg">{current?.label ?? "StayDesk"}</h1>
           </div>
           <div className="ml-auto flex items-center gap-2">

@@ -3,8 +3,7 @@
  * including payment-gateway callbacks/webhooks, guest-facing /public routes, admin mutations
  * and direct /api/auth/login — returns 404 without contacting the backend.
  *
- * List endpoints planned for Phase 4 (invoices/payments lists) are added here only when they exist
- * in the backend.
+ * Exactly the endpoints that exist in the backend (docs/API.md). Add a route here only when it is built.
  *
  * Path segments are restricted to [A-Za-z0-9._~-] starting with an alphanumeric, so `.`/`..`,
  * percent-encoding (`%2e`, `%2f`), backslashes and empty segments (`//`) can never match.
@@ -25,31 +24,26 @@ const r = (method: Rule["method"], path: string): Rule => ({
 export const ALLOWED_ROUTES: readonly Rule[] = [
   r("GET", "/api/auth/me"),
 
-  r("GET", "/api/reports/:seg"),
-  r("GET", "/api/reports/:seg/export"),
-
+  // Reads (all built in backend/src/api/reads.ts).
+  r("GET", "/api/dashboard"),
+  r("GET", "/api/bookings"),
+  r("GET", "/api/bookings/:seg"),
+  r("GET", "/api/bookings/:seg/free-rooms"),
   r("GET", "/api/rooms"),
   r("GET", "/api/room-types"),
-  r("GET", "/api/room-types/:seg"),
-  r("GET", "/api/availability"),
-
-  r("GET", "/api/bookings"),
-  r("POST", "/api/bookings"),
-  r("GET", "/api/bookings/:seg"),
-  r("POST", "/api/bookings/:seg/(?:confirm|check-in|check-out|cancel)"),
-  r("GET", "/api/bookings/:seg/charges"),
-
   r("GET", "/api/guests"),
-  r("GET", "/api/guests/:seg"),
-
-  r("GET", "/api/invoices/:seg"),
-  r("GET", "/api/invoices/:seg/pdf"),
-
+  r("GET", "/api/front-desk"),
+  r("GET", "/api/invoices"),
   r("GET", "/api/payments"),
-  r("GET", "/api/payments/refunds"),
-  r("POST", "/api/payments/cash"),
-
+  r("GET", "/api/reports"),
   r("GET", "/api/settings"),
+
+  // The eight demo actions (docs/API.md). Cancel, refund, void, housekeeping, PDF and export are not
+  // built, so they are not listed.
+  r("POST", "/api/guests"),
+  r("POST", "/api/bookings"),
+  r("POST", "/api/bookings/:seg/(?:confirm|check-in|check-out)"),
+  r("POST", "/api/payments"),
 ];
 
 /** Paths that must never be proxied even if a future rule would match them. */

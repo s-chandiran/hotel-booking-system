@@ -39,5 +39,5 @@ theme tokens; no new styles.
 
 ## Known gaps
 - No "forgot password" / change-password UI (backend has `POST /api/auth/change-password`).
-- Live sign-in against the real backend not yet exercised: backend login writes `audit_log` and
-  `users.last_login_at`, so it waits for approval (Phase 2 demo database).
+- Live sign-in has never been exercised. The app runs on mock data only (decision 2026-11-08) and
+  there is no confirmed backend, so `TBD — needs confirmation`.

@@ -45,7 +45,7 @@ export const invoicesMock: Invoice[] = bookingsMock.slice(0, 12).map((b, i) => (
 }));
 
 const methods: Payment["method"][] = ["Card", "UPI", "Cash", "Bank transfer"];
-const payStatus: Payment["status"][] = ["success", "success", "pending", "success", "refunded", "failed"];
+const payStatus: Payment["status"][] = ["success", "success", "pending", "success", "success", "failed"];
 export const paymentsMock: Payment[] = invoicesMock.filter((i) => i.status !== "void").map((inv, i) => ({
   id: `p${i + 1}`, reference: `PAY-${55010 + i}`, invoiceNumber: inv.number, guestName: inv.guestName, date: inv.issued,
   method: methods[i % methods.length]!, amount: inv.status === "partial" ? Math.round(inv.amount / 2) : inv.amount, status: payStatus[i % payStatus.length]!,
