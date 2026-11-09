@@ -295,15 +295,43 @@ export function voidInvoice(db: Db, actor: Actor, input: { invoiceId: number; re
 
 export interface RequestRefundInput {
   paymentId: number;
-  reference: string;
+  /** Omit to have the server generate the next `RF-` reference. Only the seed supplies one. */
+  reference?: string;
   amount: string;
   reason: string;
   /** Defaults to the original payment's method (Q8b assumption). */
   method?: PaymentMethod;
+  /** Same key again returns the original refund request instead of creating a second one. */
+  idempotencyKey?: string | null;
+}
+
+async function replayRefund(db: Db, actor: Actor, input: RequestRefundInput): Promise<number | null> {
+  if (!input.idempotencyKey) return null;
+  const prior = await db("refunds").where({ property_id: actor.propertyId, idempotency_key: input.idempotencyKey }).first("id", "payment_id", "amount", "reason");
+  if (!prior) return null;
+  const same = prior.payment_id === input.paymentId && toMinor(String(prior.amount)) === toMinor(input.amount) && String(prior.reason) === input.reason.trim();
+  assert(same, "IDEMPOTENCY_CONFLICT", "This request key was already used for a different refund");
+  return prior.id as number;
 }
 
 /** A new refund row; the original payment is never modified (R18). Releases allocations if needed (F1.5). */
-export function requestRefund(db: Db, actor: Actor, input: RequestRefundInput): Promise<number> {
+export async function requestRefund(db: Db, actor: Actor, input: RequestRefundInput): Promise<number> {
+  if (input.idempotencyKey) {
+    const prior = await replayRefund(db, actor, input);
+    if (prior !== null) return prior;
+  }
+  try {
+    return await insertRefund(db, actor, input);
+  } catch (e) {
+    if (input.idempotencyKey && isDuplicateOn(e, "uq_refunds_idempotency")) {
+      const prior = await replayRefund(db, actor, input);
+      if (prior !== null) return prior;
+    }
+    throw e;
+  }
+}
+
+function insertRefund(db: Db, actor: Actor, input: RequestRefundInput): Promise<number> {
   return inTx(db, async (trx) => {
     assert(input.reason.trim().length > 0, "REASON_REQUIRED", "A refund reason is required");
     const bookingId = await findBookingIdOf(trx, actor, "payments", input.paymentId);
@@ -316,8 +344,12 @@ export function requestRefund(db: Db, actor: Actor, input: RequestRefundInput): 
     const reserved = await refundsReserved(trx, p.id);
     assert(reserved + amount <= paid, "REFUND_EXCEEDS_PAYMENT", "Refunds would exceed the original payment"); // F1.4
 
+    const reference = input.reference ?? (await nextReference(trx, actor, "refund"));
     const refundId = await insertId(
-      trx("refunds").insert({ property_id: actor.propertyId, payment_id: p.id, reference: input.reference, amount: fromMinor(amount), method: input.method ?? p.method, reason: input.reason, status: "requested", requested_at: nowUtc(), created_by_user_id: actor.userId }),
+      trx("refunds").insert({
+        property_id: actor.propertyId, payment_id: p.id, reference, amount: fromMinor(amount), method: input.method ?? p.method,
+        reason: input.reason.trim(), idempotency_key: input.idempotencyKey ?? null, status: "requested", requested_at: nowUtc(), created_by_user_id: actor.userId,
+      }),
     );
     const shortfall = (await allocatedToPayment(trx, p.id)) + reserved + amount - paid;
     if (shortfall > 0n) {

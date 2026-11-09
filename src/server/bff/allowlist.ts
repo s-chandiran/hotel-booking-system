@@ -12,7 +12,7 @@
 const SEG = "[A-Za-z0-9][A-Za-z0-9._~-]{0,63}";
 
 interface Rule {
-  method: "GET" | "POST" | "PUT" | "DELETE";
+  method: "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
   pattern: RegExp;
 }
 
@@ -34,16 +34,28 @@ export const ALLOWED_ROUTES: readonly Rule[] = [
   r("GET", "/api/guests"),
   r("GET", "/api/front-desk"),
   r("GET", "/api/invoices"),
+  r("GET", "/api/invoices/:seg"),
   r("GET", "/api/payments"),
+  r("GET", "/api/refunds"),
   r("GET", "/api/reports"),
   r("GET", "/api/settings"),
+  r("PATCH", "/api/settings"),
+  r("POST", "/api/demo/clear"),
 
-  // The eight demo actions (docs/API.md). Cancel, refund, void, housekeeping, PDF and export are not
-  // built, so they are not listed.
   r("POST", "/api/guests"),
+  r("PATCH", "/api/guests/:seg"),
   r("POST", "/api/bookings"),
-  r("POST", "/api/bookings/:seg/(?:confirm|check-in|check-out)"),
+  r("PATCH", "/api/bookings/:seg"),
+  r("POST", "/api/bookings/:seg/(?:confirm|cancel|check-in|check-out)"),
   r("POST", "/api/payments"),
+  r("POST", "/api/payments/:seg/refund"),
+  r("POST", "/api/refunds/:seg/(?:complete|reject)"),
+  r("POST", "/api/invoices/:seg/void"),
+
+  // Rooms: admin-only structure and maintenance, front-desk housekeeping (roles are enforced by the API).
+  r("POST", "/api/rooms"),
+  r("PATCH", "/api/rooms/:seg"),
+  r("POST", "/api/rooms/:seg/(?:maintenance|housekeeping|remove)"),
 ];
 
 /** Paths that must never be proxied even if a future rule would match them. */

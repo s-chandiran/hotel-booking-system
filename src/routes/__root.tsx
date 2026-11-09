@@ -16,7 +16,7 @@ import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
 import { AppShell } from "../layouts/AppShell";
 import { meQuery } from "../api/auth.api";
-import { ApiError, USE_MOCK } from "../api/client";
+import { ApiError } from "../api/client";
 
 function NotFoundComponent() {
   return (
@@ -108,7 +108,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
   }),
   // Client-side session gate (UX only — the BFF enforces the session on every /api call).
   beforeLoad: async ({ context, location }) => {
-    if (USE_MOCK || location.pathname === "/login") return;
+    if (location.pathname === "/login") return;
     try {
       await context.queryClient.ensureQueryData(meQuery());
     } catch (err) {
@@ -144,7 +144,6 @@ function RootComponent() {
   // Any API call that gets a 401 (expired/revoked session) broadcasts this; drop all cached
   // data so nothing from the old session lingers, then go to the sign-in page.
   useEffect(() => {
-    if (USE_MOCK) return;
     const onExpired = () => {
       queryClient.clear();
       void router.navigate({ to: "/login" });

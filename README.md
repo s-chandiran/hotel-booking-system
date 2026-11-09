@@ -23,30 +23,44 @@ npm i
 npm run dev
 ```
 
-## Docker
+## Docker (client demo)
 
-This is a TanStack Start app. The image runs the Nitro Node server (`node .output/server/index.mjs`) on port 3000 — not a static nginx SPA.
+Start **Docker Desktop**, then from the repo root:
 
 ```sh
-# optional: copy env defaults
 cp .env.example .env
-
-docker compose up --build
+docker compose --profile tools up -d --build web api db
+docker compose --profile tools run --rm migrate
+docker compose --profile tools run --rm seed
 ```
 
 Open [http://localhost:3000](http://localhost:3000).
 
-Build-time env (rebuild after changing):
+| Username | Password | Role |
+|---|---|---|
+| `frontdesk` | `Demo@1234` | Front desk (bookings, check-in/out, payments) |
+| `admin` | `Demo@1234` | Admin (Settings, void, reports) |
+| `superadmin` | `Demo@1234` | Super admin |
 
-- `VITE_USE_MOCK` — default `true` (sample API data)
+Seed also creates **10 rooms**: `101–105` Normal (₹2500) and `201–205` AC (₹3500). No sample guests/bookings — create those live in the demo.
+
+Redeploy after code changes:
+
+```sh
+docker compose down
+docker compose --profile tools up -d --build web api db
+```
+
+(Re-run `migrate` / `seed` only on a fresh DB or after schema changes.)
+
+Build-time env (rebuild `web` after changing):
+
 - `VITE_API_BASE_URL` — leave empty; the browser calls the same-origin BFF, never Express directly
 
 Runtime env (server-only, see `.env.example` and `docs/ARCHITECTURE.md`):
 
-- `API_UPSTREAM_URL` — Express API origin (default `http://host.docker.internal:5000`)
+- `API_UPSTREAM_URL` — Express API origin (`http://api:5000` in Compose)
 - `ALLOWED_ORIGINS` — exact origins allowed to make state-changing requests
 - `SESSION_COOKIE_SECURE` — `true` behind HTTPS; `false` only for plain-http localhost
 
-```sh
-VITE_USE_MOCK=false docker compose up --build
-```
+All screens load from the real MySQL-backed API through the BFF. There is no mock-data mode.

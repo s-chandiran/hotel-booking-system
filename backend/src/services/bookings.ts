@@ -211,3 +211,54 @@ export function cancelBooking(db: Db, actor: Actor, input: { bookingId: number; 
   assert(input.reason.trim().length > 0, "REASON_REQUIRED", "A cancellation reason is required");
   return inTx(db, (trx) => transition(trx, actor, input.bookingId, ["pending", "confirmed"], "cancelled", { cancelled_at: nowUtc(), cancellation_reason: input.reason }));
 }
+
+export interface UpdateBookingInput {
+  checkInDate?: string;
+  checkOutDate?: string;
+  guestsCount?: number;
+  /** "HH:MM", or null to clear. */
+  expectedArrivalTime?: string | null;
+}
+
+/**
+ * Corrects a booking before arrival (Q25 working assumption): only `pending` or `confirmed`, and only while
+ * no invoice has been issued. The total is recomputed from the booking's stored nightly rate. Nothing about
+ * price, status, room type or reference can be passed in. Capacity and room overlap are re-checked under locks.
+ * Lock order: booking → room, as in checkIn.
+ */
+export function updateBooking(db: Db, actor: Actor, bookingId: number, input: UpdateBookingInput): Promise<{ nights: number; total: string }> {
+  return inTx(db, async (trx) => {
+    const b = await trx("bookings").where({ id: bookingId, property_id: actor.propertyId }).forUpdate().first();
+    assert(b, "BOOKING_NOT_FOUND", "Booking not found");
+    assert(["pending", "confirmed"].includes(b.status as string), "BOOKING_NOT_EDITABLE", `A ${String(b.status)} booking cannot be edited`);
+    const invoiced = await trx("invoices").where({ booking_id: bookingId, status: "issued" }).first("id");
+    assert(!invoiced, "BOOKING_NOT_EDITABLE", "A booking with an issued invoice cannot be edited");
+
+    const checkIn = input.checkInDate ?? (b.check_in_date as string);
+    const checkOut = input.checkOutDate ?? (b.check_out_date as string);
+    const nights = nightsBetween(checkIn, checkOut);
+    const guests = input.guestsCount ?? (b.guests_count as number);
+    const type = await trx("room_types").where({ id: b.room_type_id }).first("capacity");
+    assert(guests >= 1 && guests <= Number(type.capacity), "OVER_CAPACITY", "Guests exceed the room type capacity");
+    if (b.room_id != null) {
+      const room = await lockRoom(trx, actor, b.room_id as number);
+      assert(!room.is_out_of_service, "ROOM_OUT_OF_SERVICE", "The room is out of service");
+      await assertRoomFree(trx, room.id, checkIn, checkOut, bookingId);
+    }
+    const arrival = input.expectedArrivalTime === undefined ? undefined : input.expectedArrivalTime === null ? null : `${input.expectedArrivalTime}:00`;
+    const changed: string[] = [];
+    if (checkIn !== b.check_in_date) changed.push("check_in_date");
+    if (checkOut !== b.check_out_date) changed.push("check_out_date");
+    if (guests !== b.guests_count) changed.push("guests_count");
+    if (arrival !== undefined && arrival !== b.expected_arrival_time) changed.push("expected_arrival_time");
+    assert(changed.length > 0, "NOTHING_TO_CHANGE", "No changes were provided");
+
+    const total = fromMinor(toMinor(String(b.nightly_rate)) * BigInt(nights));
+    await trx("bookings").where({ id: bookingId }).update({
+      check_in_date: checkIn, check_out_date: checkOut, guests_count: guests, room_total: total, updated_at: nowUtc(),
+      ...(arrival !== undefined ? { expected_arrival_time: arrival } : {}),
+    });
+    await audit(trx, actor, { entityType: "booking", entityId: bookingId, action: "update", details: { fields: changed.join(","), nights, room_total: total } });
+    return { nights, total };
+  });
+}

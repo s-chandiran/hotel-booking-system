@@ -1,7 +1,6 @@
 # Reservations (`/bookings`) and Front desk (`/front-desk`)
 
-Status: live-data demo flow (Gate 4, demo scope D6). With sample data (`VITE_USE_MOCK=true`) the action
-buttons are hidden and the page says so; nothing pretends to work.
+Status: live-data demo flow (Gate 4, demo scope D6). All data and actions use the real API.
 
 ## Purpose
 
@@ -63,7 +62,7 @@ and Payments screens match.
 
 API failures are shown in the dialog (red note) with the server's message, for example "The room is still
 occupied by another guest". A list that cannot load shows the error page with the API's message. Nothing
-falls back to sample data.
+fabricates data on failure.
 
 ## Known gaps
 

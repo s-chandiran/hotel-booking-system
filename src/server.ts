@@ -2,7 +2,6 @@ import "./lib/error-capture";
 
 import { consumeLastCapturedError } from "./lib/error-capture";
 import { renderErrorPage } from "./lib/error-page";
-import { USE_MOCK } from "./api/client";
 import { handleBff } from "./server/bff/handler";
 import { guardPage } from "./server/bff/page-guard";
 
@@ -56,8 +55,8 @@ export default {
       // Same-origin BFF: /bff/auth/* and the allowlisted /api/* proxy (JWT stays server-side).
       const bff = await handleBff(request);
       if (bff) return bff;
-      // Server-side page gate: no session cookie → /login (skipped when running on sample data).
-      const redirect = guardPage(request, { authEnabled: !USE_MOCK });
+      // Server-side page gate: no session cookie → /login.
+      const redirect = guardPage(request, { authEnabled: true });
       if (redirect) return redirect;
 
       const handler = await getServerEntry();

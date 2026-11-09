@@ -15,7 +15,8 @@
     "db:migrate": "tsx src/db/migrate.ts latest",
     "db:status": "tsx src/db/migrate.ts status",
     "db:rollback": "tsx src/db/migrate.ts rollback",
-    "db:seed:demo": "tsx src/db/seed-demo.ts"
+    "db:seed:demo": "tsx src/db/seed-demo.ts",
+    "db:clear:demo": "tsx src/db/clear-demo.ts"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",

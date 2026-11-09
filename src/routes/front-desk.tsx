@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useSuspenseQuery } from "@tanstack/react-query";
-import { USE_MOCK } from "@/api/client";
 import { BookingManager } from "@/features/bookings/BookingManager";
 import { outlineBtn } from "@/features/bookings/ui";
 import { frontDeskQuery } from "@/api/modules.api";
@@ -34,7 +33,7 @@ function Page() {
     { header: "Time", cell: (d: FrontDeskItem) => d.time },
     { header: "Status", cell: (d: FrontDeskItem) => <StatusBadge tone={d.status === "done" ? "success" : "neutral"}>{d.status === "done" ? done : "Expected"}</StatusBadge> },
     { header: "Balance due", align: "right" as const, cell: (d: FrontDeskItem) => <span className="font-semibold">{inr(d.balance)}</span> },
-    ...(USE_MOCK ? [] : [{ header: "", align: "right" as const, cell: (d: FrontDeskItem) => <button className={outlineBtn} onClick={() => setManaging(d.id)}>{d.status === "done" ? "View" : done === "Checked in" ? "Check in" : "Check out"}</button> }]),
+    { header: "", align: "right" as const, cell: (d: FrontDeskItem) => <button className={outlineBtn} onClick={() => setManaging(d.id)}>{d.status === "done" ? "View" : done === "Checked in" ? "Check in" : "Check out"}</button> },
   ];
   return (
     <div className="mx-auto max-w-[1400px] space-y-6">

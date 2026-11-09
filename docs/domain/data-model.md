@@ -14,7 +14,7 @@
 > treatment of voided numbers, advances as liabilities, and immutable tax snapshots. Also new Q24 (tax
 > on advances).
 > **Sources read:** `src/types/modules.ts`, `src/types/dashboard.ts`, `src/api/auth.api.ts`,
-> `src/api/endpoints.ts`, `src/api/modules.api.ts`, `src/api/mock/*.ts`, `src/server/bff/allowlist.ts`,
+> `src/api/endpoints.ts`, `src/api/modules.api.ts`, `src/server/bff/allowlist.ts`,
 > `src/routes/*.tsx`, `src/features/dashboard/Dashboard.tsx`, `docs/ARCHITECTURE.md`, `docs/screens/*`.
 > **Tags:** **OBSERVED** = seen in code · **INFERRED** = follows from code but not stated ·
 > **ASSUMED** = our working decision, needs confirmation · **UNKNOWN** = see `OPEN_QUESTIONS.md` (Q#).
@@ -474,7 +474,7 @@ is the question that decides the payment ↔ invoice relationship in §5.
 
 | # | Gap | Where | Proposed handling |
 |---|---|---|---|
-| G1 | **`reserved` room status** conflicts with D2 | `RoomStatus` in `src/types/dashboard.ts`, `stats.reserved` and the "Reserved" tile in `Dashboard.tsx`, the `tone.reserved` badge in `src/routes/rooms.tsx`, and `dashboard.mock.ts` | Gate 4: remove `reserved` from the type, the tile and the mock. If "booked today, not yet arrived" is still wanted, show it as an *arrivals expected* count (bookings), not as a room status. No mapping is invented here |
+| G1 | **`reserved` room status** conflicts with D2 | Was in early frontend types/tiles; Gate 4 removed `reserved` from live API shapes. If "booked today, not yet arrived" is still wanted, show it as an *arrivals expected* count (bookings), not as a room status. |
 | G2 | **The BFF allowlist doesn't match the frontend endpoints** | `src/server/bff/allowlist.ts` vs `src/api/endpoints.ts`. The frontend calls `/api/dashboard`, `/api/front-desk`, `/api/invoices` (list) and `/api/reports` (no segment), and **none of these are allowlisted**, so they would 404 live. The allowlist has routes nothing calls (`/api/room-types`, `/api/availability`, booking actions, `/api/payments/cash`, `/api/payments/refunds`), all modelled on the other app | Gate 4: allowlist exactly the endpoints built in Gate 3, and drop the rest |
 | G3 | **Misleading action buttons** | The Dashboard quick actions "New booking", "Add guest", "Check-in" and "Check-out" (`Dashboard.tsx:44-47`) are links to list pages. Nothing creates or checks in. The Reservations meta says "View and manage" | Gate 4: relabel (e.g. "View reservations") or disable with "Coming soon" until mutations exist (D5) |
 | G4 | **Names instead of identities** | `guestName` on Booking, Invoice, Payment and FrontDeskItem | The API can keep these display fields, but the DB joins by id |

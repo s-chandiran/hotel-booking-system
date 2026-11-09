@@ -4,7 +4,6 @@ services:
       context: .
       dockerfile: Dockerfile
       args:
-        VITE_USE_MOCK: ${VITE_USE_MOCK:-true}
         VITE_API_BASE_URL: ${VITE_API_BASE_URL:-}
     ports:
       - "${PORT:-3000}:3000"
@@ -25,7 +24,7 @@ services:
   # MySQL 8.4 (DATABASE.md). Users are created by backend/docker/db-init on the FIRST start of an
   # empty volume only. Changing passwords later needs a manual ALTER USER or a fresh volume.
   db:
-    # In the "tools" profile so plain `docker compose up` (web, mock data) is unchanged until Gate 4.
+    # In the "tools" profile with migrate/seed/api.
     profiles: ["tools"]
     image: mysql:8.4
     command:
@@ -51,9 +50,9 @@ services:
       retries: 30
     restart: unless-stopped
 
-  # Express API (Gate 3b). Same "tools" profile, so plain `docker compose up` (web, mock data) is unchanged
-  # until Gate 4. It refuses to start while migrations are pending (run `migrate` first) and runs as the
-  # restricted app DB user. For the BFF to reach it, set API_UPSTREAM_URL=http://api:5000 in .env.
+  # Express API (Gate 3b). Same "tools" profile. It refuses to start while migrations are pending
+  # (run `migrate` first) and runs as the restricted app DB user. For the BFF to reach it, set
+  # API_UPSTREAM_URL=http://api:5000 in .env.
   #   docker compose --profile tools up -d --build api
   api:
     profiles: ["tools"]
@@ -71,6 +70,10 @@ services:
       JWT_SECRET: ${JWT_SECRET:-}
       JWT_TTL_SECONDS: ${JWT_TTL_SECONDS:-28800}
       HOTEL_SLUG: ${HOTEL_SLUG:-}
+      # Local demo: Settings → Clear demo data (migrator DELETE). Never enable on a real production host.
+      ALLOW_DEMO_CLEAR: ${ALLOW_DEMO_CLEAR:-true}
+      DB_MIGRATOR_USER: ${DB_MIGRATOR_USER:-staydesk_migrator}
+      DB_MIGRATOR_PASSWORD: ${DB_MIGRATOR_PASSWORD:-}
     ports:
       - "127.0.0.1:${API_PORT:-5000}:5000"
     healthcheck:
@@ -120,12 +123,33 @@ services:
       DB_APP_PASSWORD: ${DB_APP_PASSWORD:-}
       HOTEL_SLUG: ${HOTEL_SLUG:-}
       SEED_BASE_DATE: ${SEED_BASE_DATE:-}
-      DEMO_FRONT_DESK_USERNAME: ${DEMO_FRONT_DESK_USERNAME:-}
-      DEMO_FRONT_DESK_PASSWORD: ${DEMO_FRONT_DESK_PASSWORD:-}
-      DEMO_ADMIN_USERNAME: ${DEMO_ADMIN_USERNAME:-}
-      DEMO_ADMIN_PASSWORD: ${DEMO_ADMIN_PASSWORD:-}
-      DEMO_SUPER_ADMIN_USERNAME: ${DEMO_SUPER_ADMIN_USERNAME:-}
-      DEMO_SUPER_ADMIN_PASSWORD: ${DEMO_SUPER_ADMIN_PASSWORD:-}
+      # Defaults match seed-demo.ts / .env.example so a friend can demo without editing env.
+      DEMO_FRONT_DESK_USERNAME: ${DEMO_FRONT_DESK_USERNAME:-frontdesk}
+      DEMO_FRONT_DESK_PASSWORD: ${DEMO_FRONT_DESK_PASSWORD:-Demo@1234}
+      DEMO_ADMIN_USERNAME: ${DEMO_ADMIN_USERNAME:-admin}
+      DEMO_ADMIN_PASSWORD: ${DEMO_ADMIN_PASSWORD:-Demo@1234}
+      DEMO_SUPER_ADMIN_USERNAME: ${DEMO_SUPER_ADMIN_USERNAME:-superadmin}
+      DEMO_SUPER_ADMIN_PASSWORD: ${DEMO_SUPER_ADMIN_PASSWORD:-Demo@1234}
+    depends_on:
+      db:
+        condition: service_healthy
+
+  # Wipe guests/bookings/money; keep logins; restore 10 rooms.
+  #   docker compose --profile tools run --rm clear-demo
+  clear-demo:
+    profiles: ["tools"]
+    build:
+      context: ./backend
+    command: ["node", "dist/db/clear-demo.js"]
+    environment:
+      NODE_ENV: development
+      ALLOW_DEMO_CLEAR: "true"
+      DB_HOST: db
+      DB_PORT: 3306
+      DB_NAME: ${DB_NAME:-staydesk}
+      DB_MIGRATOR_USER: ${DB_MIGRATOR_USER:-staydesk_migrator}
+      DB_MIGRATOR_PASSWORD: ${DB_MIGRATOR_PASSWORD:-}
+      HOTEL_SLUG: ${HOTEL_SLUG:-}
     depends_on:
       db:
         condition: service_healthy

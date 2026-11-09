@@ -2,7 +2,7 @@ import { useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import {
-  bookingDetailQuery, checkInBooking, checkOutBooking, confirmBooking, freeRoomsQuery, keyFor, METHODS, recordPayment, refreshAll,
+  bookingDetailQuery, cancelBooking, checkInBooking, updateBooking, checkOutBooking, confirmBooking, freeRoomsQuery, keyFor, METHODS, recordPayment, refreshAll,
   type BookingDetail, type CheckOutResult, type PaymentMethod,
 } from "@/api/actions.api";
 import { inr } from "@/components/app/DataTable";
@@ -126,7 +126,87 @@ function Body({ id }: { id: string }) {
           <ErrorNote error={checkOut.error} />
         </Section>
       )}
+      {(b.status === "pending" || b.status === "confirmed") && (
+        <>
+          <EditSection key={`${b.checkIn}-${b.checkOut}-${b.guests}-${b.arrivalTime}`} b={b} onDone={(total) => { setDone(`Booking updated. Room total is now ${inr(total)} (before tax).`); }} />
+          <CancelSection id={id} advance={b.advanceHeld} onDone={() => { setDone(null); }} />
+        </>
+      )}
+      {b.status === "cancelled" && <Note tone="warning">This booking is cancelled.{b.advanceHeld > 0 ? ` ${inr(b.advanceHeld)} received is still held for the guest; refunds are decided by an admin.` : ""}</Note>}
     </div>
+  );
+}
+
+function EditSection({ b, onDone }: { b: BookingDetail; onDone: (total: number) => void }) {
+  const qc = useQueryClient();
+  const [open, setOpen] = useState(false);
+  const [checkIn, setCheckIn] = useState(b.checkIn);
+  const [checkOut, setCheckOut] = useState(b.checkOut);
+  const [guests, setGuests] = useState(b.guests);
+  const [arrival, setArrival] = useState(b.arrivalTime ?? "");
+  const save = useMutation({
+    mutationFn: () => updateBooking(b.id, {
+      ...(checkIn !== b.checkIn ? { checkInDate: checkIn } : {}), ...(checkOut !== b.checkOut ? { checkOutDate: checkOut } : {}),
+      ...(guests !== b.guests ? { guestsCount: guests } : {}), ...(arrival !== (b.arrivalTime ?? "") ? { expectedArrivalTime: arrival || null } : {}),
+    }),
+    onSuccess: async (r) => {
+      onDone(r.total);
+      setOpen(false);
+      await refreshAll(qc);
+    },
+  });
+  const unchanged = checkIn === b.checkIn && checkOut === b.checkOut && guests === b.guests && arrival === (b.arrivalTime ?? "");
+  const valid = checkOut > checkIn && guests >= 1 && !unchanged;
+  return (
+    <Section title="Edit details">
+      {!open ? <button className={outlineBtn} onClick={() => setOpen(true)}>Edit dates, guests or arrival time</button> : (
+        <form className="space-y-3" onSubmit={(e) => { e.preventDefault(); if (valid && !save.isPending) save.mutate(); }}>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <Field label="Check-in"><input type="date" className={fieldClass} value={checkIn} onChange={(e) => setCheckIn(e.target.value)} required /></Field>
+            <Field label="Check-out"><input type="date" className={fieldClass} value={checkOut} min={checkIn} onChange={(e) => setCheckOut(e.target.value)} required /></Field>
+            <Field label="Guests"><input type="number" className={fieldClass} min={1} value={guests} onChange={(e) => setGuests(Number(e.target.value))} required /></Field>
+            <Field label="Expected arrival"><input type="time" className={fieldClass} value={arrival} onChange={(e) => setArrival(e.target.value)} /></Field>
+          </div>
+          {checkOut <= checkIn && <p className="text-xs text-destructive">Check-out must be after check-in.</p>}
+          <p className="text-xs text-muted-foreground">The price per night stays as booked; the total is recalculated by the server.</p>
+          <ErrorNote error={save.error} />
+          <div className="flex gap-2">
+            <button type="submit" className={primaryBtn} disabled={!valid || save.isPending}>{save.isPending ? "Saving…" : "Save changes"}</button>
+            <button type="button" className={outlineBtn} onClick={() => setOpen(false)}>Cancel</button>
+          </div>
+        </form>
+      )}
+    </Section>
+  );
+}
+
+function CancelSection({ id, advance, onDone }: { id: string; advance: number; onDone: () => void }) {
+  const qc = useQueryClient();
+  const [open, setOpen] = useState(false);
+  const [reason, setReason] = useState("");
+  const cancel = useMutation({
+    mutationFn: () => cancelBooking(id, reason.trim()),
+    onSuccess: async () => {
+      onDone();
+      await refreshAll(qc);
+    },
+  });
+  return (
+    <Section title="Cancel booking">
+      {!open ? <button className={outlineBtn} onClick={() => setOpen(true)}>Cancel this booking…</button> : (
+        <div className="space-y-3">
+          <Note tone="warning">
+            Cancelling cannot be undone.{advance > 0 ? ` The ${inr(advance)} already received stays held for the guest; nothing is refunded automatically.` : ""}
+          </Note>
+          <Field label="Reason (required)"><input className={fieldClass} value={reason} maxLength={500} onChange={(e) => setReason(e.target.value)} /></Field>
+          <ErrorNote error={cancel.error} />
+          <div className="flex gap-2">
+            <button className={primaryBtn} disabled={!reason.trim() || cancel.isPending} onClick={() => cancel.mutate()}>{cancel.isPending ? "Cancelling…" : "Confirm cancellation"}</button>
+            <button className={outlineBtn} onClick={() => setOpen(false)}>Keep booking</button>
+          </div>
+        </div>
+      )}
+    </Section>
   );
 }
 

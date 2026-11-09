@@ -4,14 +4,14 @@
 - `npm ci` · `npm run dev` · `npm test` (vitest) · `npm run build` · `npx tsc --noEmit -p .`
 - Lint: `npm run lint` fails on CRLF line endings from `core.autocrlf=true` checkouts (pre-existing,
   thousands of `Delete ␍`). For real findings: `npx eslint . --rule '{"prettier/prettier":["error",{"endOfLine":"auto"}]}'`.
-- Build for the node-server image: `VITE_USE_MOCK=false NITRO_PRESET=node-server npm run build`, run
+- Build for the node-server image: `NITRO_PRESET=node-server npm run build`, run
   `node .output/server/index.mjs`.
-- Docker, sample data: `docker compose up --build` with `VITE_USE_MOCK=true` → http://localhost:3000.
-- Docker, **live demo** (`.env` has `VITE_USE_MOCK=false`, `API_UPSTREAM_URL=http://api:5000`, the DB and `JWT_SECRET`
-  values): `docker compose --profile tools up -d --build web api db`, then once `docker compose --profile tools run --rm migrate`
-  and `docker compose --profile tools run --rm seed`. Open http://localhost:3000 and sign in with the `DEMO_*` accounts
-  from `.env`. Name the services: a bare `--profile tools up` would also start the one-off `migrate` and `seed`.
-- Host run without Docker: build with `VITE_USE_MOCK=false NITRO_PRESET=node-server npm run build`, start the API with
+- Docker live demo (`.env` has `API_UPSTREAM_URL=http://api:5000`, the DB and `JWT_SECRET` values):
+  `docker compose --profile tools up -d --build web api db`, then once
+  `docker compose --profile tools run --rm migrate` and `docker compose --profile tools run --rm seed`.
+  Open http://localhost:3000 and sign in with the `DEMO_*` accounts from `.env`. Name the services: a
+  bare `--profile tools up` would also start the one-off `migrate` and `seed`.
+- Host run without Docker: build with `NITRO_PRESET=node-server npm run build`, start the API with
   `npm run dev:api` (in `backend/`) and the web with `HOST=127.0.0.1 PORT=3000 API_UPSTREAM_URL=http://127.0.0.1:5000
   SESSION_COOKIE_SECURE=false node .output/server/index.mjs`. Browse **127.0.0.1:3000**: if the Docker `web` container is up,
   `localhost:3000` (IPv6) reaches that one instead.
@@ -32,11 +32,9 @@
   `docker compose up` doesn't start it.
 
 ## Architecture gotchas
-- **Own backend in this repo (decision 2026-11-09, replaces "mock only" of 2026-11-08):** MySQL 8.4 +
-  Express/TS + knex under `backend/`, built through 4 gates, each a hard stop for user approval
-  (plan: `C:\Users\Developer\.claude\plans\can-you-create-database-floating-bumblebee.md`). Until
-  Gate 4, keep `VITE_USE_MOCK=true`. `D:\projects\Hotel` is a DIFFERENT application: never read, edit
-  or start sessions there.
+- **Own backend in this repo (decision 2026-11-09):** MySQL 8.4 + Express/TS + knex under `backend/`.
+  Frontend mock-data mode was removed (2026-11-09): all screens use the live API via the BFF.
+  `D:\projects\Hotel` is a DIFFERENT application: never read, edit or start sessions there.
 - The domain is fixed in `docs/domain/data-model.md` (approved). Don't make financial or business
   decisions while writing tables or code: follow that doc and `docs/DATABASE.md`, and raise anything
   new in `docs/domain/OPEN_QUESTIONS.md`.

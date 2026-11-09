@@ -127,6 +127,7 @@ export async function createFixture(): Promise<Fixture> {
     { property_id: propertyId, document_type: "invoice", series: fy, prefix: `IT/${tag}/${fy}/`, next_value: 1 },
     { property_id: propertyId, document_type: "booking", series: "BK", prefix: `BK${tag}-`, next_value: 1 },
     { property_id: propertyId, document_type: "payment", series: "PAY", prefix: `PY${tag}-`, next_value: 1 },
+    { property_id: propertyId, document_type: "refund", series: "RF", prefix: `RF${tag}-`, next_value: 1 },
   ]);
 
   let n = 0;

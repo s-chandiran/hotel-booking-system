@@ -3,7 +3,6 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState, type ReactNode } from "react";
 import { Bell, ChevronLeft, ChevronRight, Hotel, LogOut, Menu, Search, X } from "lucide-react";
 import { navGroups, allNavItems } from "./nav";
-import { USE_MOCK } from "@/api/client";
 import { initials, logout, meQuery, roleLabel } from "@/api/auth.api";
 import { cn } from "@/lib/utils";
 
@@ -66,13 +65,13 @@ export function AppShell({ children }: { children: ReactNode }) {
   const current = allNavItems.find((i) => (i.to === "/" ? pathname === "/" : pathname.startsWith(i.to)));
   const queryClient = useQueryClient();
   const navigate = useNavigate();
-  const { data: user } = useQuery({ ...meQuery(), enabled: !USE_MOCK });
+  const { data: user } = useQuery(meQuery());
   const [signingOut, setSigningOut] = useState(false);
   const displayName = user ? (user.full_name ?? user.username) : "Front Desk";
   const displayRole = user ? roleLabel(user.role) : "Front Desk";
 
   async function onLogout() {
-    if (USE_MOCK || signingOut) return;
+    if (signingOut) return;
     setSigningOut(true);
     try {
       await logout();
@@ -125,7 +124,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             <Menu className="size-5" />
           </button>
           <div className="min-w-0">
-            <p className="truncate text-xs text-muted-foreground">{USE_MOCK ? "Sample Property" : "StayDesk"} / {current?.label ?? "Page"}</p>
+            <p className="truncate text-xs text-muted-foreground">StayDesk / {current?.label ?? "Page"}</p>
             <h1 className="truncate text-base font-semibold md:text-lg">{current?.label ?? "StayDesk"}</h1>
           </div>
           <div className="ml-auto flex items-center gap-2">
@@ -145,20 +144,15 @@ export function AppShell({ children }: { children: ReactNode }) {
             </div>
             <button
               onClick={onLogout}
-              disabled={USE_MOCK || signingOut}
+              disabled={signingOut}
               className="rounded-lg p-2 text-muted-foreground hover:bg-muted disabled:opacity-50"
               aria-label="Log out"
-              title={USE_MOCK ? "Sign-out is available when connected to the hotel system" : "Log out"}
+              title="Log out"
             >
               <LogOut className="size-5" />
             </button>
           </div>
         </header>
-        {USE_MOCK && (
-          <div className="border-b border-border bg-warning-soft px-4 py-1.5 text-center text-xs font-medium text-warning md:px-6">
-            Showing sample data — not connected to the live hotel system yet.
-          </div>
-        )}
         <main className="flex-1 p-4 md:p-6 lg:p-8">{children}</main>
       </div>
     </div>

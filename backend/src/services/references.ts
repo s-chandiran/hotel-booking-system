@@ -8,7 +8,7 @@ import type { Knex } from "knex";
 import { assert } from "../domain/errors.js";
 import { nowUtc, type Actor } from "./context.js";
 
-export async function nextReference(trx: Knex.Transaction, actor: Actor, kind: "booking" | "payment"): Promise<string> {
+export async function nextReference(trx: Knex.Transaction, actor: Actor, kind: "booking" | "payment" | "refund"): Promise<string> {
   const seq = await trx("number_sequences").where({ property_id: actor.propertyId, document_type: kind }).forUpdate().first("id", "prefix", "next_value");
   assert(seq, "SEQUENCE_NOT_CONFIGURED", `No ${kind} reference sequence for this property`);
   const n = seq.next_value as number;

@@ -226,11 +226,11 @@ describe("read endpoint shapes", () => {
     const bookings = await keys("/api/bookings");
     expect(Object.keys(bookings[0]).sort()).toEqual(["checkIn", "checkOut", "guestName", "guests", "id", "reference", "roomNumber", "roomType", "source", "status", "total"]);
     const rooms = await keys("/api/rooms");
-    expect(Object.keys(rooms[0]).sort()).toEqual(["capacity", "floor", "housekeeping", "id", "number", "rate", "status", "type"]);
+    expect(Object.keys(rooms[0]).sort()).toEqual(["capacity", "floor", "housekeeping", "id", "number", "outOfService", "rate", "roomTypeId", "status", "type"]);
     const guests = await keys("/api/guests");
-    expect(Object.keys(guests[0]).sort()).toEqual(["country", "email", "id", "lastStay", "name", "phone", "stays", "vip"]);
+    expect(Object.keys(guests[0]).sort()).toEqual(["country", "countryCode", "email", "id", "lastStay", "name", "phone", "stays", "vip"]);
     const pays = await keys("/api/payments");
-    expect(Object.keys(pays[0]).sort()).toEqual(["amount", "date", "guestName", "id", "invoiceNumber", "method", "reference", "refundedAmount", "status"]);
+    expect(Object.keys(pays[0]).sort()).toEqual(["amount", "date", "guestName", "id", "invoiceNumber", "method", "reference", "refundableAmount", "refundedAmount", "status"]);
     expect(pays[0]).toMatchObject({ invoiceNumber: "Advance", method: "UPI", amount: 500, status: "success" });
     expect(Array.isArray(await keys("/api/invoices"))).toBe(true);
     expect(Array.isArray(await keys("/api/front-desk"))).toBe(true);

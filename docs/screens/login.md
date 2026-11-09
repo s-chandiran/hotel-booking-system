@@ -7,7 +7,6 @@ Staff sign-in. Exchanges a username/password for a session cookie via the BFF.
 - Reached: any page navigation without a session cookie (server 302), any API 401
   (`session-expired`), the header Log out button, or typing `/login`.
 - Exited: successful sign-in → `/`. If already signed in, `/login` redirects to `/`.
-- In sample-data mode (`VITE_USE_MOCK` not `false`) `/login` redirects to `/`.
 
 ## Permissions
 - UI: public page, rendered without `AppShell`.
@@ -39,5 +38,3 @@ theme tokens; no new styles.
 
 ## Known gaps
 - No "forgot password" / change-password UI (backend has `POST /api/auth/change-password`).
-- Live sign-in has never been exercised. The app runs on mock data only (decision 2026-11-08) and
-  there is no confirmed backend, so `TBD — needs confirmation`.

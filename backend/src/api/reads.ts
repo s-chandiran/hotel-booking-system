@@ -166,7 +166,7 @@ export function readRoutes(db: Knex): Router {
     const invoices = await db("v_invoice_balance").where({ booking_id: id }).orderBy("invoice_id").select("invoice_id", "invoice_number", "status", "gross_amount", "balance_due", "payment_status");
     res.json({
       id: String(b.id), reference: b.reference, status: b.status, guestName: b.full_name, roomType: b.type_name, roomNumber: b.room_number ?? "", checkIn: b.check_in_date, checkOut: b.check_out_date,
-      guests: b.guests_count, source: SOURCE[b.source] ?? b.source, total: num(b.room_total), received: num(v?.received_net), advanceHeld: num(v?.advance_held),
+      guests: b.guests_count, arrivalTime: hhmm(b.expected_arrival_time), source: SOURCE[b.source] ?? b.source, total: num(b.room_total), received: num(v?.received_net), advanceHeld: num(v?.advance_held),
       balanceDue: bal, balanceIsEstimate: num(v?.invoice_count) === 0, // D-D: shown as the checkout warning
       invoices: invoices.map((i) => ({ id: String(i.invoice_id), number: i.invoice_number, status: i.payment_status, amount: num(i.gross_amount), balanceDue: num(i.balance_due) })),
     });
@@ -183,9 +183,9 @@ export function readRoutes(db: Knex): Router {
   }));
 
   r.get("/rooms", route(async (req, res) => {
-    const rows = await db("v_room_status as v").join("room_types as t", "t.id", "v.room_type_id").where("v.property_id", pid(req)).orderBy("v.number")
-      .select("v.room_id", "v.number", "v.floor", "t.name as type", "v.status", "t.base_rate", "t.capacity", "v.housekeeping_status");
-    res.json(rows.map((x) => ({ id: String(x.room_id), number: x.number, floor: x.floor, type: x.type, status: x.status, rate: num(x.base_rate), capacity: x.capacity, housekeeping: x.housekeeping_status })));
+    const rows = await db("v_room_status as v").join("room_types as t", "t.id", "v.room_type_id").join("rooms as rm", "rm.id", "v.room_id").where("v.property_id", pid(req)).orderBy("v.number")
+      .select("v.room_id", "v.number", "v.floor", "t.name as type", "t.id as type_id", "v.status", "t.base_rate", "t.capacity", "v.housekeeping_status", "rm.is_out_of_service");
+    res.json(rows.map((x) => ({ id: String(x.room_id), number: x.number, floor: x.floor, type: x.type, roomTypeId: String(x.type_id), status: x.status, outOfService: !!x.is_out_of_service, rate: num(x.base_rate), capacity: x.capacity, housekeeping: x.housekeeping_status })));
   }));
 
   r.get("/guests", route(async (req, res) => {
@@ -195,7 +195,7 @@ export function readRoutes(db: Knex): Router {
       .groupBy("g.id", "g.full_name", "g.email", "g.phone", "g.country_code", "g.is_vip")
       .orderBy("g.full_name")
       .select("g.id", "g.full_name", "g.email", "g.phone", "g.country_code", "g.is_vip", db.raw("COUNT(b.id) AS stays"), db.raw("MAX(b.check_out_date) AS last_stay"));
-    res.json(rows.map((g) => ({ id: String(g.id), name: g.full_name, email: g.email ?? "", phone: g.phone ?? "", country: country(g.country_code), stays: Number(g.stays), lastStay: g.last_stay ?? "", vip: !!g.is_vip })));
+    res.json(rows.map((g) => ({ id: String(g.id), name: g.full_name, email: g.email ?? "", phone: g.phone ?? "", country: country(g.country_code), countryCode: g.country_code ?? "", stays: Number(g.stays), lastStay: g.last_stay ?? "", vip: !!g.is_vip })));
   }));
 
   r.get("/front-desk", route(async (req, res) => {
@@ -210,16 +210,93 @@ export function readRoutes(db: Knex): Router {
     res.json(rows.map((i) => ({ id: String(i.invoice_id), number: i.invoice_number, guestName: i.full_name, reference: i.reference, issued: i.issue_date, amount: num(i.gross_amount), tax: num(i.tax_amount), status: i.payment_status, balanceDue: num(i.balance_due) })));
   }));
 
+  /** Invoice detail with immutable lines and tax snapshot. Issued amounts are never editable. */
+  r.get("/invoices/:id", route(async (req, res) => {
+    const id = idParam(req);
+    const row = await db("v_invoice_balance as v")
+      .join("invoices as i", "i.id", "v.invoice_id")
+      .join("bookings as b", "b.id", "v.booking_id")
+      .join("guests as g", "g.id", "b.guest_id")
+      .where({ "v.property_id": pid(req), "v.invoice_id": id })
+      .first(
+        "v.invoice_id", "v.invoice_number", "i.invoice_type", "i.status as document_status", "i.void_reason",
+        "g.full_name", "b.reference", "v.issue_date", "i.net_amount", "v.tax_amount", "v.gross_amount", "v.payment_status", "v.balance_due",
+      );
+    if (!row) throw new HttpError(404, "INVOICE_NOT_FOUND", "Invoice not found");
+    const lines = await db("invoice_lines").where({ invoice_id: id }).orderBy("line_no")
+      .select("line_no", "description", "quantity", "unit_price", "line_net");
+    const taxLines = await db("invoice_tax_lines").where({ invoice_id: id }).orderBy("apply_order")
+      .select("component_code", "component_name", "rate_percent", "taxable_base", "tax_amount");
+    res.json({
+      id: String(row.invoice_id),
+      number: row.invoice_number,
+      type: row.invoice_type,
+      documentStatus: row.document_status,
+      voidReason: row.void_reason ?? null,
+      guestName: row.full_name,
+      reference: row.reference,
+      issued: row.issue_date,
+      net: num(row.net_amount),
+      tax: num(row.tax_amount),
+      amount: num(row.gross_amount),
+      status: row.payment_status,
+      balanceDue: num(row.balance_due),
+      lines: lines.map((l) => ({
+        lineNo: l.line_no as number,
+        description: l.description as string,
+        quantity: num(l.quantity),
+        unitPrice: num(l.unit_price),
+        lineNet: num(l.line_net),
+      })),
+      taxLines: taxLines.map((t) => ({
+        code: t.component_code as string,
+        name: t.component_name as string,
+        ratePercent: num(t.rate_percent),
+        taxableBase: num(t.taxable_base),
+        taxAmount: num(t.tax_amount),
+      })),
+    });
+  }));
+
   r.get("/payments", route(async (req, res) => {
     const p = await property(db, pid(req));
     const rows = await db("v_payment_balance as v").join("bookings as b", "b.id", "v.booking_id").join("guests as g", "g.id", "b.guest_id").where("v.property_id", p.id).orderBy("v.received_at", "desc")
-      .select("v.payment_id", "v.reference", "g.full_name", "v.received_at", "v.method", "v.amount", "v.status", "v.refunded_completed");
+      .select("v.payment_id", "v.reference", "g.full_name", "v.received_at", "v.method", "v.amount", "v.status", "v.refunded_completed", "v.refunds_reserved");
     const alloc = await db("v_allocation_net as a").join("invoices as i", "i.id", "a.invoice_id").where("i.property_id", p.id).where("a.net_amount", ">", 0).select("a.payment_id", "i.invoice_number");
     const byPayment = new Map<number, string[]>();
     for (const a of alloc) byPayment.set(a.payment_id as number, [...(byPayment.get(a.payment_id as number) ?? []), a.invoice_number as string]);
+    res.json(rows.map((x) => {
+      const amount = num(x.amount);
+      const reserved = num(x.refunds_reserved);
+      return {
+        id: String(x.payment_id), reference: x.reference, invoiceNumber: (byPayment.get(x.payment_id as number) ?? []).join(", ") || "Advance", guestName: x.full_name,
+        date: businessDate(utc(String(x.received_at)), p.timezone), method: METHOD[x.method] ?? x.method, amount, status: x.status, refundedAmount: num(x.refunded_completed),
+        // Cap for a new refund request: payment total minus requested+completed refunds (F1.4).
+        refundableAmount: x.status === "success" ? Math.max(0, amount - reserved) : 0,
+      };
+    }));
+  }));
+
+  /** Admin refund queue: requested / completed / rejected rows for the property. */
+  r.get("/refunds", requireRole("admin"), route(async (req, res) => {
+    const p = await property(db, pid(req));
+    const rows = await db("refunds as r")
+      .join("payments as pay", "pay.id", "r.payment_id")
+      .join("bookings as b", "b.id", "pay.booking_id")
+      .join("guests as g", "g.id", "b.guest_id")
+      .where("r.property_id", p.id)
+      .orderBy("r.requested_at", "desc")
+      .select("r.id", "r.reference", "r.payment_id", "pay.reference as payment_reference", "g.full_name", "r.amount", "r.reason", "r.status", "r.requested_at");
     res.json(rows.map((x) => ({
-      id: String(x.payment_id), reference: x.reference, invoiceNumber: (byPayment.get(x.payment_id as number) ?? []).join(", ") || "Advance", guestName: x.full_name,
-      date: businessDate(utc(String(x.received_at)), p.timezone), method: METHOD[x.method] ?? x.method, amount: num(x.amount), status: x.status, refundedAmount: num(x.refunded_completed),
+      id: String(x.id),
+      reference: x.reference,
+      paymentId: String(x.payment_id),
+      paymentReference: x.payment_reference,
+      guestName: x.full_name,
+      amount: num(x.amount),
+      reason: x.reason,
+      status: x.status,
+      requestedAt: businessDate(utc(String(x.requested_at)), p.timezone),
     })));
   }));
 

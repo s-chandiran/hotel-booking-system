@@ -3,7 +3,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useState, type FormEvent } from "react";
 import { Hotel, Loader2 } from "lucide-react";
 import { login, meQuery, meQueryKey } from "@/api/auth.api";
-import { ApiError, USE_MOCK } from "@/api/client";
+import { ApiError } from "@/api/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -17,8 +17,6 @@ export const Route = createFileRoute("/login")({
     ],
   }),
   beforeLoad: async ({ context }) => {
-    // Sample-data mode has no backend session; already signed in → straight to the dashboard.
-    if (USE_MOCK) throw redirect({ to: "/" });
     const user = await context.queryClient.fetchQuery(meQuery()).catch(() => null);
     if (user) throw redirect({ to: "/" });
   },

@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useSuspenseQuery } from "@tanstack/react-query";
-import { USE_MOCK } from "@/api/client";
 import { BookingManager } from "@/features/bookings/BookingManager";
 import { NewBookingDialog } from "@/features/bookings/NewBookingDialog";
 import { outlineBtn } from "@/features/bookings/ui";
@@ -35,7 +34,7 @@ function Page() {
   return (
     <div className="mx-auto max-w-[1400px] space-y-6">
       <PageHeader title="Reservations" subtitle="All bookings across channels.">
-        {USE_MOCK ? <p className="text-xs text-muted-foreground">Sample data: booking actions need the live backend.</p> : <NewBookingDialog />}
+        <NewBookingDialog />
       </PageHeader>
       <StatRow items={[{ label: "Total", value: data.length }, { label: "Confirmed", value: c("confirmed") }, { label: "Pending", value: c("pending") }, { label: "In house", value: c("checked_in") }]} />
       <DataTable rows={data} rowKey={(b) => b.id} searchText={(b) => `${b.reference} ${b.guestName} ${b.roomNumber}`} columns={[
@@ -46,7 +45,7 @@ function Page() {
         { header: "Source", cell: (b) => b.source },
         { header: "Status", cell: (b) => <StatusBadge tone={tone[b.status][0]}>{tone[b.status][1]}</StatusBadge> },
         { header: "Total", align: "right", cell: (b) => <span className="font-semibold">{inr(b.total)}</span> },
-        ...(USE_MOCK ? [] : [{ header: "", align: "right" as const, cell: (b: (typeof data)[number]) => <button className={outlineBtn} onClick={() => setManaging(b.id)}>Manage</button> }]),
+        { header: "", align: "right", cell: (b) => <button className={outlineBtn} onClick={() => setManaging(b.id)}>Manage</button> },
       ]} />
       <BookingManager bookingId={managing} onClose={() => setManaging(null)} />
     </div>

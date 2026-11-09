@@ -8,9 +8,6 @@
  */
 export const API_BASE_URL = (import.meta.env["VITE_API_BASE_URL"] as string | undefined) ?? "";
 
-/** Sample data is used until VITE_USE_MOCK is set to "false" and real API contracts are wired. */
-export const USE_MOCK = (import.meta.env["VITE_USE_MOCK"] as string | undefined) !== "false";
-
 export const CSRF_HEADER = "X-StayDesk-CSRF";
 
 export class ApiError extends Error {
