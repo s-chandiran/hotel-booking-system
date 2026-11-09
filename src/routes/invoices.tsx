@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { invoicesQuery } from "@/api/modules.api";
+import { InvoiceActions } from "@/features/invoices/InvoiceDialogs";
 import { DataTable, PageHeader, StatRow, inr } from "@/components/app/DataTable";
 import { StatusBadge, type Tone } from "@/components/app/StatusBadge";
 import type { Invoice } from "@/types/modules";
@@ -25,7 +26,7 @@ function Page() {
   const live = data.filter((i) => i.status !== "void");
   return (
     <div className="mx-auto max-w-[1400px] space-y-6">
-      <PageHeader title="Invoices" subtitle="Billing for guest stays." />
+      <PageHeader title="Invoices" subtitle="Billing for guest stays. Issued amounts are never edited; void keeps the number on record." />
       <StatRow items={[{ label: "Invoices", value: data.length }, { label: "Billed", value: inr(live.reduce((s, i) => s + i.amount, 0)) }, { label: "Unpaid", value: data.filter((i) => i.status === "unpaid").length }, { label: "Tax collected", value: inr(live.reduce((s, i) => s + i.tax, 0)) }]} />
       <DataTable rows={data} rowKey={(i) => i.id} searchText={(i) => `${i.number} ${i.guestName} ${i.reference}`} columns={[
         { header: "Invoice", cell: (i) => <span className="font-medium">{i.number}</span> },
@@ -34,7 +35,9 @@ function Page() {
         { header: "Issued", cell: (i) => i.issued },
         { header: "Status", cell: (i) => <StatusBadge tone={tone[i.status][0]}>{tone[i.status][1]}</StatusBadge> },
         { header: "Tax", align: "right", cell: (i) => inr(i.tax) },
+        { header: "Balance due", align: "right", cell: (i) => (i.status === "void" ? "—" : inr(i.balanceDue ?? 0)) },
         { header: "Amount", align: "right", cell: (i) => <span className="font-semibold">{inr(i.amount)}</span> },
+        { header: "", align: "right", cell: (i) => <InvoiceActions invoice={i} /> },
       ]} />
     </div>
   );

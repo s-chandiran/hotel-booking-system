@@ -6,6 +6,8 @@ import {
   useRouter,
   HeadContent,
   Scripts,
+  redirect,
+  useRouterState,
   type ErrorComponentProps,
 } from "@tanstack/react-router";
 import { useEffect, type ReactNode } from "react";
@@ -13,6 +15,8 @@ import { useEffect, type ReactNode } from "react";
 import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
 import { AppShell } from "../layouts/AppShell";
+import { meQuery } from "../api/auth.api";
+import { ApiError } from "../api/client";
 
 function NotFoundComponent() {
   return (
@@ -50,7 +54,9 @@ function ErrorComponent({ error, reset }: ErrorComponentProps) {
           This page didn't load
         </h1>
         <p className="mt-2 text-sm text-muted-foreground">
-          Something went wrong on our end. You can try refreshing or head back home.
+          {error instanceof ApiError
+            ? error.message
+            : "Something went wrong on our end. You can try refreshing or head back home."}
         </p>
         <div className="mt-6 flex flex-wrap justify-center gap-2">
           <button
@@ -100,6 +106,16 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { rel: "icon", href: "/favicon.ico", type: "image/x-icon" },
     ],
   }),
+  // Client-side session gate (UX only — the BFF enforces the session on every /api call).
+  beforeLoad: async ({ context, location }) => {
+    if (location.pathname === "/login") return;
+    try {
+      await context.queryClient.ensureQueryData(meQuery());
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 401) throw redirect({ to: "/login" });
+      throw err;
+    }
+  },
   shellComponent: RootShell,
   component: RootComponent,
   notFoundComponent: NotFoundComponent,
@@ -122,13 +138,30 @@ function RootShell({ children }: { children: ReactNode }) {
 
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
+  const router = useRouter();
+  const pathname = useRouterState({ select: (s) => s.location.pathname });
+
+  // Any API call that gets a 401 (expired/revoked session) broadcasts this; drop all cached
+  // data so nothing from the old session lingers, then go to the sign-in page.
+  useEffect(() => {
+    const onExpired = () => {
+      queryClient.clear();
+      void router.navigate({ to: "/login" });
+    };
+    window.addEventListener("session-expired", onExpired);
+    return () => window.removeEventListener("session-expired", onExpired);
+  }, [queryClient, router]);
 
   return (
     <QueryClientProvider client={queryClient}>
       {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
-      <AppShell>
+      {pathname === "/login" ? (
         <Outlet />
-      </AppShell>
+      ) : (
+        <AppShell>
+          <Outlet />
+        </AppShell>
+      )}
     </QueryClientProvider>
   );
 }

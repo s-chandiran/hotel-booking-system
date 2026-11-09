@@ -1,11 +1,10 @@
 // Provisional shapes: replace with the backend's real contracts once documented.
-export type RoomStatus = "available" | "occupied" | "reserved" | "maintenance";
+export type RoomStatus = "available" | "occupied" | "maintenance";
 
 export interface DashboardStats {
   totalRooms: number;
   available: number;
   occupied: number;
-  reserved: number;
   maintenance: number;
   checkInsToday: number;
   checkOutsToday: number;
@@ -32,7 +31,7 @@ export interface RecentBooking {
   roomNumber: string;
   checkIn: string;
   checkOut: string;
-  status: "confirmed" | "pending" | "cancelled" | "checked_in";
+  status: "confirmed" | "pending" | "cancelled" | "checked_in" | "checked_out";
   total: number;
 }
 

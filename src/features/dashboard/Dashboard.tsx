@@ -1,6 +1,6 @@
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
-import { BedDouble, CalendarPlus, DoorOpen, LogIn, LogOut, UserPlus, Wrench, CalendarCheck, Wallet, KeyRound } from "lucide-react";
+import { BedDouble, CalendarPlus, DoorOpen, LogIn, LogOut, Wrench, Wallet, KeyRound } from "lucide-react";
 import { dashboardQuery } from "@/api/dashboard.api";
 import { Card, EmptyState, StatusBadge, type Tone } from "@/components/app/StatusBadge";
 import type { Movement, RecentBooking, RoomStatus } from "@/types/dashboard";
@@ -9,7 +9,6 @@ import { cn } from "@/lib/utils";
 const roomTone: Record<RoomStatus, { tone: Tone; label: string; tile: string }> = {
   available: { tone: "success", label: "Available", tile: "bg-success-soft text-success" },
   occupied: { tone: "info", label: "Occupied", tile: "bg-info-soft text-info" },
-  reserved: { tone: "warning", label: "Reserved", tile: "bg-warning-soft text-warning" },
   maintenance: { tone: "danger", label: "Maintenance", tile: "bg-danger-soft text-destructive" },
 };
 const bookingTone: Record<RecentBooking["status"], { tone: Tone; label: string }> = {
@@ -17,6 +16,12 @@ const bookingTone: Record<RecentBooking["status"], { tone: Tone; label: string }
   pending: { tone: "warning", label: "Pending" },
   cancelled: { tone: "danger", label: "Cancelled" },
   checked_in: { tone: "info", label: "Checked in" },
+  checked_out: { tone: "neutral", label: "Checked out" },
+};
+
+const greeting = (): string => {
+  const h = new Date().getHours();
+  return h < 12 ? "Good morning" : h < 17 ? "Good afternoon" : "Good evening";
 };
 
 export function Dashboard() {
@@ -29,7 +34,6 @@ export function Dashboard() {
     { label: "Total rooms", value: s.totalRooms, icon: BedDouble, tone: "text-foreground bg-muted" },
     { label: "Available", value: s.available, icon: KeyRound, tone: "text-success bg-success-soft" },
     { label: "Occupied", value: s.occupied, icon: DoorOpen, tone: "text-info bg-info-soft" },
-    { label: "Reserved", value: s.reserved, icon: CalendarCheck, tone: "text-warning bg-warning-soft" },
     { label: "Maintenance", value: s.maintenance, icon: Wrench, tone: "text-destructive bg-danger-soft" },
   ];
 
@@ -37,18 +41,17 @@ export function Dashboard() {
     <div className="mx-auto max-w-[1400px] space-y-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <h2 className="text-2xl font-bold tracking-tight">Good evening</h2>
+          <h2 className="text-2xl font-bold tracking-tight">{greeting()}</h2>
           <p className="text-sm text-muted-foreground">Here's what's happening at {data.propertyName} today.</p>
         </div>
         <div className="grid grid-cols-2 gap-2 sm:flex">
           <QuickAction to="/bookings" icon={CalendarPlus} label="New booking" primary />
-          <QuickAction to="/guests" icon={UserPlus} label="Add guest" />
-          <QuickAction to="/front-desk" icon={LogIn} label="Check-in" />
-          <QuickAction to="/front-desk" icon={LogOut} label="Check-out" />
+          <QuickAction to="/front-desk" icon={LogIn} label="Arrivals" />
+          <QuickAction to="/front-desk" icon={LogOut} label="Departures" />
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-5">
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-4">
         {stats.map(({ label, value, icon: Icon, tone }) => (
           <div key={label} className="card-surface flex items-center gap-3 p-4">
             <div className={cn("grid size-10 shrink-0 place-items-center rounded-lg", tone)}><Icon className="size-5" /></div>
@@ -149,7 +152,7 @@ function Glance({ label, value }: { label: string; value: React.ReactNode }) {
   return <li className="flex items-center justify-between"><span className="text-muted-foreground">{label}</span><span className="font-semibold">{value}</span></li>;
 }
 
-function QuickAction({ to, icon: Icon, label, primary }: { to: "/bookings" | "/guests" | "/front-desk"; icon: typeof LogIn; label: string; primary?: boolean }) {
+function QuickAction({ to, icon: Icon, label, primary }: { to: "/bookings" | "/front-desk"; icon: typeof LogIn; label: string; primary?: boolean }) {
   return (
     <Link to={to} className={cn("inline-flex items-center justify-center gap-2 rounded-lg px-3.5 py-2.5 text-sm font-semibold transition-colors", primary ? "bg-primary text-primary-foreground hover:bg-primary/90" : "border border-border bg-card hover:bg-muted")}>
       <Icon className="size-4" /> {label}

@@ -1,11 +1,12 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { paymentsQuery } from "@/api/modules.api";
+import { PendingRefundsPanel, RequestRefundButton } from "@/features/payments/RefundDialogs";
 import { DataTable, PageHeader, StatRow, inr } from "@/components/app/DataTable";
 import { StatusBadge, type Tone } from "@/components/app/StatusBadge";
 import type { Payment } from "@/types/modules";
 
-const tone: Record<Payment["status"], [Tone, string]> = { success: ["success", "Received"], pending: ["warning", "Pending"], refunded: ["info", "Refunded"], failed: ["danger", "Failed"] };
+const tone: Record<Payment["status"], [Tone, string]> = { success: ["success", "Received"], pending: ["warning", "Pending"], failed: ["danger", "Failed"] };
 
 export const Route = createFileRoute("/payments")({
   head: () => ({
@@ -25,8 +26,9 @@ function Page() {
   const sum = (s: Payment["status"]) => inr(data.filter((p) => p.status === s).reduce((a, p) => a + p.amount, 0));
   return (
     <div className="mx-auto max-w-[1400px] space-y-6">
-      <PageHeader title="Payments" subtitle="Money received against invoices." />
-      <StatRow items={[{ label: "Transactions", value: data.length }, { label: "Received", value: sum("success") }, { label: "Pending", value: sum("pending") }, { label: "Refunded", value: sum("refunded") }]} />
+      <PageHeader title="Payments" subtitle="Money received against invoices. Refunds are requested and decided separately; payment amounts are never edited." />
+      <StatRow items={[{ label: "Transactions", value: data.length }, { label: "Received", value: sum("success") }, { label: "Pending", value: sum("pending") }, { label: "Refunded", value: inr(data.reduce((a, p) => a + (p.refundedAmount ?? 0), 0)) }]} />
+      <PendingRefundsPanel />
       <DataTable rows={data} rowKey={(p) => p.id} searchText={(p) => `${p.reference} ${p.guestName} ${p.invoiceNumber} ${p.method}`} columns={[
         { header: "Reference", cell: (p) => <span className="font-medium">{p.reference}</span> },
         { header: "Guest", cell: (p) => p.guestName },
@@ -35,6 +37,7 @@ function Page() {
         { header: "Method", cell: (p) => p.method },
         { header: "Status", cell: (p) => <StatusBadge tone={tone[p.status][0]}>{tone[p.status][1]}</StatusBadge> },
         { header: "Amount", align: "right", cell: (p) => <span className="font-semibold">{inr(p.amount)}</span> },
+        { header: "", align: "right", cell: (p) => <RequestRefundButton payment={p} /> },
       ]} />
     </div>
   );

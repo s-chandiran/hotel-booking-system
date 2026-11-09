@@ -2,6 +2,8 @@ import "./lib/error-capture";
 
 import { consumeLastCapturedError } from "./lib/error-capture";
 import { renderErrorPage } from "./lib/error-page";
+import { handleBff } from "./server/bff/handler";
+import { guardPage } from "./server/bff/page-guard";
 
 type ServerEntry = {
   fetch: (request: Request, env: unknown, ctx: unknown) => Promise<Response> | Response;
@@ -50,6 +52,13 @@ function isH3SwallowedErrorBody(body: string): boolean {
 export default {
   async fetch(request: Request, env: unknown, ctx: unknown) {
     try {
+      // Same-origin BFF: /bff/auth/* and the allowlisted /api/* proxy (JWT stays server-side).
+      const bff = await handleBff(request);
+      if (bff) return bff;
+      // Server-side page gate: no session cookie → /login.
+      const redirect = guardPage(request, { authEnabled: true });
+      if (redirect) return redirect;
+
       const handler = await getServerEntry();
       const response = await handler.fetch(request, env, ctx);
       return await normalizeCatastrophicSsrResponse(response);

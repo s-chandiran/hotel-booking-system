@@ -14,6 +14,7 @@ import { Route as BookingsRouteImport } from './routes/bookings'
 import { Route as FrontDeskRouteImport } from './routes/front-desk'
 import { Route as GuestsRouteImport } from './routes/guests'
 import { Route as InvoicesRouteImport } from './routes/invoices'
+import { Route as LoginRouteImport } from './routes/login'
 import { Route as PaymentsRouteImport } from './routes/payments'
 import { Route as ReportsRouteImport } from './routes/reports'
 import { Route as RoomsRouteImport } from './routes/rooms'
@@ -44,6 +45,11 @@ const InvoicesRoute = InvoicesRouteImport.update({
   path: '/invoices',
   getParentRoute: () => rootRouteImport,
 } as any)
+const LoginRoute = LoginRouteImport.update({
+  id: '/login',
+  path: '/login',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const PaymentsRoute = PaymentsRouteImport.update({
   id: '/payments',
   path: '/payments',
@@ -71,6 +77,7 @@ export interface FileRoutesByFullPath {
   '/front-desk': typeof FrontDeskRoute
   '/guests': typeof GuestsRoute
   '/invoices': typeof InvoicesRoute
+  '/login': typeof LoginRoute
   '/payments': typeof PaymentsRoute
   '/reports': typeof ReportsRoute
   '/rooms': typeof RoomsRoute
@@ -82,6 +89,7 @@ export interface FileRoutesByTo {
   '/front-desk': typeof FrontDeskRoute
   '/guests': typeof GuestsRoute
   '/invoices': typeof InvoicesRoute
+  '/login': typeof LoginRoute
   '/payments': typeof PaymentsRoute
   '/reports': typeof ReportsRoute
   '/rooms': typeof RoomsRoute
@@ -94,6 +102,7 @@ export interface FileRoutesById {
   '/front-desk': typeof FrontDeskRoute
   '/guests': typeof GuestsRoute
   '/invoices': typeof InvoicesRoute
+  '/login': typeof LoginRoute
   '/payments': typeof PaymentsRoute
   '/reports': typeof ReportsRoute
   '/rooms': typeof RoomsRoute
@@ -107,6 +116,7 @@ export interface FileRouteTypes {
     | '/front-desk'
     | '/guests'
     | '/invoices'
+    | '/login'
     | '/payments'
     | '/reports'
     | '/rooms'
@@ -118,6 +128,7 @@ export interface FileRouteTypes {
     | '/front-desk'
     | '/guests'
     | '/invoices'
+    | '/login'
     | '/payments'
     | '/reports'
     | '/rooms'
@@ -129,6 +140,7 @@ export interface FileRouteTypes {
     | '/front-desk'
     | '/guests'
     | '/invoices'
+    | '/login'
     | '/payments'
     | '/reports'
     | '/rooms'
@@ -141,6 +153,7 @@ export interface RootRouteChildren {
   FrontDeskRoute: typeof FrontDeskRoute
   GuestsRoute: typeof GuestsRoute
   InvoicesRoute: typeof InvoicesRoute
+  LoginRoute: typeof LoginRoute
   PaymentsRoute: typeof PaymentsRoute
   ReportsRoute: typeof ReportsRoute
   RoomsRoute: typeof RoomsRoute
@@ -184,6 +197,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof InvoicesRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/login': {
+      id: '/login'
+      path: '/login'
+      fullPath: '/login'
+      preLoaderRoute: typeof LoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/payments': {
       id: '/payments'
       path: '/payments'
@@ -221,6 +241,7 @@ const rootRouteChildren: RootRouteChildren = {
   FrontDeskRoute: FrontDeskRoute,
   GuestsRoute: GuestsRoute,
   InvoicesRoute: InvoicesRoute,
+  LoginRoute: LoginRoute,
   PaymentsRoute: PaymentsRoute,
   ReportsRoute: ReportsRoute,
   RoomsRoute: RoomsRoute,

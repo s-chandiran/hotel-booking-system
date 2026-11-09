@@ -1,8 +1,9 @@
-import { Link, useRouterState } from "@tanstack/react-router";
+import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState, type ReactNode } from "react";
 import { Bell, ChevronLeft, ChevronRight, Hotel, LogOut, Menu, Search, X } from "lucide-react";
 import { navGroups, allNavItems } from "./nav";
-import { USE_MOCK } from "@/api/client";
+import { initials, logout, meQuery, roleLabel } from "@/api/auth.api";
 import { cn } from "@/lib/utils";
 
 function SidebarNav({ collapsed, onNavigate }: { collapsed: boolean; onNavigate?: () => void }) {
@@ -62,6 +63,26 @@ export function AppShell({ children }: { children: ReactNode }) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const current = allNavItems.find((i) => (i.to === "/" ? pathname === "/" : pathname.startsWith(i.to)));
+  const queryClient = useQueryClient();
+  const navigate = useNavigate();
+  const { data: user } = useQuery(meQuery());
+  const [signingOut, setSigningOut] = useState(false);
+  const displayName = user ? (user.full_name ?? user.username) : "Front Desk";
+  const displayRole = user ? roleLabel(user.role) : "Front Desk";
+
+  async function onLogout() {
+    if (signingOut) return;
+    setSigningOut(true);
+    try {
+      await logout();
+    } catch {
+      // The cookie is HttpOnly; if the BFF call failed we still drop local state below.
+    } finally {
+      queryClient.clear();
+      setSigningOut(false);
+      await navigate({ to: "/login" });
+    }
+  }
 
   return (
     <div className="flex min-h-screen bg-background">
@@ -103,7 +124,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             <Menu className="size-5" />
           </button>
           <div className="min-w-0">
-            <p className="truncate text-xs text-muted-foreground">Sample Property / {current?.label ?? "Page"}</p>
+            <p className="truncate text-xs text-muted-foreground">StayDesk / {current?.label ?? "Page"}</p>
             <h1 className="truncate text-base font-semibold md:text-lg">{current?.label ?? "StayDesk"}</h1>
           </div>
           <div className="ml-auto flex items-center gap-2">
@@ -116,19 +137,22 @@ export function AppShell({ children }: { children: ReactNode }) {
               <span className="absolute right-2 top-2 size-2 rounded-full bg-primary" />
             </button>
             <div className="flex items-center gap-2 rounded-lg py-1 pl-1 pr-2">
-              <div className="grid size-8 place-items-center rounded-full bg-accent text-xs font-bold text-accent-foreground">FD</div>
-              <span className="hidden text-sm font-medium sm:block">Front Desk</span>
+              <div className="grid size-8 place-items-center rounded-full bg-accent text-xs font-bold text-accent-foreground">
+                {user ? initials(user.full_name, user.username) : "FD"}
+              </div>
+              <span className="hidden text-sm font-medium sm:block" title={displayRole}>{displayName}</span>
             </div>
-            <button className="rounded-lg p-2 text-muted-foreground hover:bg-muted" aria-label="Log out" title="Log out (connects to backend in Phase 4)">
+            <button
+              onClick={onLogout}
+              disabled={signingOut}
+              className="rounded-lg p-2 text-muted-foreground hover:bg-muted disabled:opacity-50"
+              aria-label="Log out"
+              title="Log out"
+            >
               <LogOut className="size-5" />
             </button>
           </div>
         </header>
-        {USE_MOCK && (
-          <div className="border-b border-border bg-warning-soft px-4 py-1.5 text-center text-xs font-medium text-warning md:px-6">
-            Showing sample data — not connected to the live hotel system yet.
-          </div>
-        )}
         <main className="flex-1 p-4 md:p-6 lg:p-8">{children}</main>
       </div>
     </div>

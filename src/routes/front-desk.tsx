@@ -1,5 +1,8 @@
+import { useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useSuspenseQuery } from "@tanstack/react-query";
+import { BookingManager } from "@/features/bookings/BookingManager";
+import { outlineBtn } from "@/features/bookings/ui";
 import { frontDeskQuery } from "@/api/modules.api";
 import { DataTable, PageHeader, StatRow, inr } from "@/components/app/DataTable";
 import { StatusBadge } from "@/components/app/StatusBadge";
@@ -20,6 +23,7 @@ export const Route = createFileRoute("/front-desk")({
 
 function Page() {
   const { data } = useSuspenseQuery(frontDeskQuery());
+  const [managing, setManaging] = useState<string | null>(null);
   const arr = data.filter((d) => d.kind === "arrival");
   const dep = data.filter((d) => d.kind === "departure");
   const cols = (done: string) => [
@@ -29,12 +33,14 @@ function Page() {
     { header: "Time", cell: (d: FrontDeskItem) => d.time },
     { header: "Status", cell: (d: FrontDeskItem) => <StatusBadge tone={d.status === "done" ? "success" : "neutral"}>{d.status === "done" ? done : "Expected"}</StatusBadge> },
     { header: "Balance due", align: "right" as const, cell: (d: FrontDeskItem) => <span className="font-semibold">{inr(d.balance)}</span> },
+    { header: "", align: "right" as const, cell: (d: FrontDeskItem) => <button className={outlineBtn} onClick={() => setManaging(d.id)}>{d.status === "done" ? "View" : done === "Checked in" ? "Check in" : "Check out"}</button> },
   ];
   return (
     <div className="mx-auto max-w-[1400px] space-y-6">
       <PageHeader title="Check-in / Check-out" subtitle="Today's arrivals and departures." />
       <StatRow items={[{ label: "Arrivals", value: arr.length }, { label: "Checked in", value: arr.filter((a) => a.status === "done").length }, { label: "Departures", value: dep.length }, { label: "Checked out", value: dep.filter((a) => a.status === "done").length }]} />
       <DataTable title="Arrivals" rows={arr} rowKey={(d) => d.id} searchText={(d) => `${d.guestName} ${d.reference} ${d.roomNumber}`} columns={cols("Checked in")} />
+      <BookingManager bookingId={managing} onClose={() => setManaging(null)} />
       <DataTable title="Departures" rows={dep} rowKey={(d) => d.id} searchText={(d) => `${d.guestName} ${d.reference} ${d.roomNumber}`} columns={cols("Checked out")} />
     </div>
   );
