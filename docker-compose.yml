@@ -12,20 +12,23 @@ services:
       HOST: 0.0.0.0
       PORT: 3000
       # BFF (server-only): where the Express API lives, which origins may write, cookie mode.
-      API_UPSTREAM_URL: ${API_UPSTREAM_URL:-http://host.docker.internal:5000}
+      API_UPSTREAM_URL: ${API_UPSTREAM_URL:-http://api:5000}
       ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-http://localhost:3000}
       # false only because the local demo is plain http://localhost; use true behind HTTPS.
       SESSION_COOKIE_SECURE: ${SESSION_COOKIE_SECURE:-false}
       HOTEL_SLUG: ${HOTEL_SLUG:-}
     extra_hosts:
       - "host.docker.internal:host-gateway"
+    depends_on:
+      api:
+        condition: service_healthy
     restart: unless-stopped
 
+  # Plain `docker compose up -d --build` starts the whole demo:
+  #   db (healthy) → migrate (runs once) → seed (runs once, idempotent) → api (healthy) → web.
   # MySQL 8.4 (DATABASE.md). Users are created by backend/docker/db-init on the FIRST start of an
   # empty volume only. Changing passwords later needs a manual ALTER USER or a fresh volume.
   db:
-    # In the "tools" profile with migrate/seed/api.
-    profiles: ["tools"]
     image: mysql:8.4
     command:
       # Triggers are created by the non-SUPER migrator user while binary logging is on.
@@ -50,12 +53,9 @@ services:
       retries: 30
     restart: unless-stopped
 
-  # Express API (Gate 3b). Same "tools" profile. It refuses to start while migrations are pending
-  # (run `migrate` first) and runs as the restricted app DB user. For the BFF to reach it, set
-  # API_UPSTREAM_URL=http://api:5000 in .env.
-  #   docker compose --profile tools up -d --build api
+  # Express API (Gate 3b). It refuses to start while migrations are pending, so it waits for
+  # `migrate` and `seed` to finish. Runs as the restricted app DB user.
   api:
-    profiles: ["tools"]
     build:
       context: ./backend
     command: ["node", "dist/api/server.js"]
@@ -84,16 +84,17 @@ services:
     depends_on:
       db:
         condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+      seed:
+        condition: service_completed_successfully
     # No automatic restart: pending migrations or a missing JWT_SECRET are fixed by a person, not a retry loop.
     restart: "no"
 
-  # Explicit one-off tools (never run automatically):
-  #   docker compose --profile tools up -d db                   start MySQL
-  #   docker compose --profile tools run --rm migrate           apply migrations
-  #   docker compose --profile tools run --rm migrate status    list applied / pending
-  #   docker compose --profile tools run --rm seed              demo data (refuses NODE_ENV=production)
+  # One-shot jobs that run on every `up` and then exit (both are safe to repeat):
+  #   migrate: applies pending migrations (`docker compose run --rm migrate status` lists them)
+  #   seed:    demo login users + 10 rooms, skips rows that exist (refuses NODE_ENV=production)
   migrate:
-    profiles: ["tools"]
     build:
       context: ./backend
     entrypoint: ["node", "dist/db/migrate.js"]
@@ -108,9 +109,9 @@ services:
     depends_on:
       db:
         condition: service_healthy
+    restart: "no"
 
   seed:
-    profiles: ["tools"]
     build:
       context: ./backend
     command: ["node", "dist/db/seed-demo.js"]
@@ -131,8 +132,9 @@ services:
       DEMO_SUPER_ADMIN_USERNAME: ${DEMO_SUPER_ADMIN_USERNAME:-superadmin}
       DEMO_SUPER_ADMIN_PASSWORD: ${DEMO_SUPER_ADMIN_PASSWORD:-Demo@1234}
     depends_on:
-      db:
-        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    restart: "no"
 
   # Wipe guests/bookings/money; keep logins; restore 10 rooms.
   #   docker compose --profile tools run --rm clear-demo

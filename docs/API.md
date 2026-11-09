@@ -11,7 +11,7 @@ no CORS. The BFF turns the HttpOnly session cookie into `Authorization: Bearer <
 allowlisted paths. The BFF allowlist (`src/server/bff/allowlist.ts`) lists exactly these endpoints and nothing else; anything
 not built returns 404 without reaching this API.
 
-- Start: `npm run dev:api` (in `backend/`, reads `../.env`) or `docker compose --profile tools up -d --build api`.
+- Start: `npm run dev:api` (in `backend/`, reads `../.env`) or `docker compose up -d --build` (starts db, runs migrate and seed, then api and web).
 - It runs as the restricted app DB user and **refuses to start** while migrations are pending (it never
   runs them) or when `JWT_SECRET` is missing or shorter than 32 characters.
 - Health: `GET /health` → `{ "status": "ok" }` (public, says nothing else).

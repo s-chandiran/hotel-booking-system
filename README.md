@@ -29,10 +29,13 @@ Start **Docker Desktop**, then from the repo root:
 
 ```sh
 cp .env.example .env
-docker compose --profile tools up -d --build web api db
-docker compose --profile tools run --rm migrate
-docker compose --profile tools run --rm seed
+docker compose up -d --build
 ```
+
+This one command starts everything in order: `db` → `migrate` (applies migrations, then exits) →
+`seed` (login users + rooms, skips what already exists, then exits) → `api` → `web`. `migrate` and
+`seed` showing as **Exited (0)** in `docker compose ps -a` is normal. Give `web` a few seconds after
+it starts before opening the page.
 
 Open [http://localhost:3000](http://localhost:3000).
 
@@ -48,10 +51,11 @@ Redeploy after code changes:
 
 ```sh
 docker compose down
-docker compose --profile tools up -d --build web api db
+docker compose up -d --build
 ```
 
-(Re-run `migrate` / `seed` only on a fresh DB or after schema changes.)
+Data stays in the `staydesk-mysql` volume across `down`/`up`. Only `docker compose down -v` deletes it.
+To wipe guests/bookings/money but keep logins: `docker compose --profile tools run --rm clear-demo`.
 
 Build-time env (rebuild `web` after changing):
 

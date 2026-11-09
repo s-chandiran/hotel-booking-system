@@ -7,10 +7,11 @@
 - Build for the node-server image: `NITRO_PRESET=node-server npm run build`, run
   `node .output/server/index.mjs`.
 - Docker live demo (`.env` has `API_UPSTREAM_URL=http://api:5000`, the DB and `JWT_SECRET` values):
-  `docker compose --profile tools up -d --build web api db`, then once
-  `docker compose --profile tools run --rm migrate` and `docker compose --profile tools run --rm seed`.
-  Open http://localhost:3000 and sign in with the `DEMO_*` accounts from `.env`. Name the services: a
-  bare `--profile tools up` would also start the one-off `migrate` and `seed`.
+  plain `docker compose down` then `docker compose up -d --build` (2026-11-09: db/api/migrate/seed
+  are no longer in a profile; chain is db healthy → migrate → seed → api healthy → web). `migrate` and
+  `seed` run on every `up` and exit 0 (both idempotent). Only `clear-demo` stays in the `tools` profile.
+  Open http://localhost:3000 and sign in with the `DEMO_*` accounts from `.env`. Right after `web`
+  starts, pages can briefly 500 or show blank; wait a few seconds.
 - Host run without Docker: build with `NITRO_PRESET=node-server npm run build`, start the API with
   `npm run dev:api` (in `backend/`) and the web with `HOST=127.0.0.1 PORT=3000 API_UPSTREAM_URL=http://127.0.0.1:5000
   SESSION_COOKIE_SECURE=false node .output/server/index.mjs`. Browse **127.0.0.1:3000**: if the Docker `web` container is up,
@@ -23,13 +24,13 @@
   kept out of `npm test`. Each run adds an `itest-<random>` property that can't be deleted (no DELETE
   grant); recreate the volume to clear it.
 - API (Gate 3b, `backend/src/api/`): `npm run dev:api` (reads `../.env`; needs `JWT_SECRET` of 32+ chars)
-  or `docker compose --profile tools up -d --build api` (port 5000, loopback only). Contract in
+  or `docker compose up -d --build api` (port 5000, loopback only). Contract in
   `docs/API.md`. It refuses to start with pending migrations. Run `npm run build` before the Docker
   image build checks, and never put `JWT_SECRET` in a committed file.
 - DB via Docker (needs `.env` with the DB passwords). Each is a single cmd.exe line:
-  `docker compose --profile tools up -d db`, then `docker compose --profile tools run --rm migrate`,
-  then `docker compose --profile tools run --rm seed`. `db` is in the `tools` profile, so plain
-  `docker compose up` doesn't start it.
+  `docker compose up -d db` (DB only), or `docker compose run --rm migrate status` to list migrations.
+  The seed is now only login users + 10 rooms, so `seed-regression.itest.ts` (T7, old 40-room seed)
+  fails 5 tests: that test is stale, not the code.
 
 ## Architecture gotchas
 - **Own backend in this repo (decision 2026-11-09):** MySQL 8.4 + Express/TS + knex under `backend/`.
