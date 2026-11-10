@@ -17,6 +17,11 @@ services:
       # false only because the local demo is plain http://localhost; use true behind HTTPS.
       SESSION_COOKIE_SECURE: ${SESSION_COOKIE_SECURE:-false}
       HOTEL_SLUG: ${HOTEL_SLUG:-}
+      # Host-persisted PDFs / uploads (Electron sets STAYDESK_DOCUMENTS to ProgramData).
+      STAYDESK_DOCUMENTS_DIR: /var/staydesk/documents
+    volumes:
+      # Persist documents outside the image so container recreate does not drop PDFs.
+      - ${STAYDESK_DOCUMENTS:-./.staydesk-data/documents}:/var/staydesk/documents
     extra_hosts:
       - "host.docker.internal:host-gateway"
     depends_on:
@@ -74,6 +79,9 @@ services:
       ALLOW_DEMO_CLEAR: ${ALLOW_DEMO_CLEAR:-true}
       DB_MIGRATOR_USER: ${DB_MIGRATOR_USER:-staydesk_migrator}
       DB_MIGRATOR_PASSWORD: ${DB_MIGRATOR_PASSWORD:-}
+      STAYDESK_DOCUMENTS_DIR: /var/staydesk/documents
+    volumes:
+      - ${STAYDESK_DOCUMENTS:-./.staydesk-data/documents}:/var/staydesk/documents
     ports:
       - "127.0.0.1:${API_PORT:-5000}:5000"
     healthcheck:

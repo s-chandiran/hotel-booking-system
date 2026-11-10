@@ -1,0 +1,62 @@
+{
+  "name": "staydesk-desktop",
+  "version": "1.0.0",
+  "private": true,
+  "description": "StayDesk Windows desktop shell (Electron + local Docker Compose)",
+  "main": "main.cjs",
+  "scripts": {
+    "start": "electron .",
+    "pack": "electron-builder --win --dir",
+    "dist": "electron-builder --win"
+  },
+  "build": {
+    "appId": "com.staydesk.desktop",
+    "productName": "StayDesk",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "main.cjs",
+      "preload.cjs",
+      "lib/**/*",
+      "splash.html",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "../docker-compose.yml",
+        "to": "compose/docker-compose.yml"
+      },
+      {
+        "from": "../.env.example",
+        "to": "compose/.env.example"
+      },
+      {
+        "from": "../docs/DESKTOP_OPERATOR.md",
+        "to": "DESKTOP_OPERATOR.md"
+      }
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "artifactName": "StayDesk-Setup-${version}.${ext}"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "perMachine": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true
+    }
+  },
+  "devDependencies": {
+    "electron": "^33.2.0",
+    "electron-builder": "^25.1.8"
+  }
+}

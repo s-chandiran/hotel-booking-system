@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { settingsQuery } from "@/api/modules.api";
 import { ClearDemoPanel } from "@/features/settings/ClearDemoPanel";
+import { DesktopBackupPanel } from "@/features/settings/DesktopBackupPanel";
 import { PropertySettingsForm } from "@/features/settings/PropertySettingsForm";
 import { DataTable, PageHeader } from "@/components/app/DataTable";
 import { Card, StatusBadge } from "@/components/app/StatusBadge";
@@ -27,6 +28,7 @@ function Page() {
       <Card title="Property">
         <PropertySettingsForm key={`${data.property.name}|${data.property.checkInTime}|${data.property.checkOutTime}|${data.property.phone}|${data.property.email}|${data.property.address}`} property={data.property} taxComponents={data.taxComponents} />
       </Card>
+      <DesktopBackupPanel />
       <ClearDemoPanel />
       <DataTable title="Staff" rows={data.staff} rowKey={(s) => s.id} searchText={(s) => `${s.name} ${s.email} ${s.role}`} columns={[
         { header: "Name", cell: (s) => <span className="font-medium">{s.name}</span> },

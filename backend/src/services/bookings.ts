@@ -13,7 +13,7 @@ import { assert } from "../domain/errors.js";
 import { businessDate, financialYear } from "../domain/dates.js";
 import { fromMinor, toMinor } from "../domain/money.js";
 import { audit, inTx, insertId, nowUtc, type Actor } from "./context.js";
-import { issueInvoice } from "./finance.js";
+import { issueInvoice, type NewlyPaidInvoice } from "./finance.js";
 import { isDuplicateOn, nextReference } from "./references.js";
 
 type Trx = Knex.Transaction;
@@ -152,6 +152,7 @@ export function checkIn(db: Db, actor: Actor, input: { bookingId: number; roomId
 export interface CheckOutResult {
   invoiceId: number | null;
   invoiceNumber: string | null;
+  newlyPaidInvoices: NewlyPaidInvoice[];
 }
 
 /**
@@ -171,10 +172,10 @@ export function checkOut(db: Db, actor: Actor, input: { bookingId: number; at?: 
     await trx("bookings").where({ id: b.id }).update({ status: "checked_out", checked_out_at: at, updated_at: nowUtc() });
     await trx("rooms").where({ id: b.room_id! }).update({ housekeeping_status: "dirty", updated_at: nowUtc() });
     await audit(trx, actor, { entityType: "booking", entityId: b.id, action: "check_out", fromState: "checked_in", toState: "checked_out" });
-    if (input.finalInvoice === false) return { invoiceId: null, invoiceNumber: null };
+    if (input.finalInvoice === false) return { invoiceId: null, invoiceNumber: null, newlyPaidInvoices: [] };
 
     const existing = await trx("invoices").where({ booking_id: b.id, invoice_type: "stay", status: "issued" }).first("id");
-    if (existing) return { invoiceId: null, invoiceNumber: null };
+    if (existing) return { invoiceId: null, invoiceNumber: null, newlyPaidInvoices: [] };
     const property = await trx("properties").where({ id: actor.propertyId }).first("timezone");
     const type = await trx("room_types").where({ id: b.room_type_id }).first("name");
     const issueDate = businessDate(at, property.timezone as string);
@@ -183,7 +184,7 @@ export function checkOut(db: Db, actor: Actor, input: { bookingId: number; at?: 
       bookingId: b.id, invoiceType: "stay", issueDate, series: financialYear(issueDate),
       lines: [{ description: `${type.name as string} room, ${nights} night(s)`, quantity: `${nights}.00`, unitPrice: String(b.nightly_rate) }],
     });
-    return { invoiceId: inv.invoiceId, invoiceNumber: inv.invoiceNumber };
+    return { invoiceId: inv.invoiceId, invoiceNumber: inv.invoiceNumber, newlyPaidInvoices: inv.newlyPaidInvoices };
   });
 }
 

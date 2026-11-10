@@ -49,7 +49,7 @@ describe("T5 demo journey through the services", () => {
     expect([bk.nightly_rate, bk.room_total]).toEqual(["1000.00", "3000.00"]);
     await confirmBooking(fx.db, fx.actor, bookingId);
 
-    const advanceId = await recordPayment(fx.db, fx.actor, { bookingId, method: "cash", amount: "1000.00", status: "success" });
+    const advanceId = (await recordPayment(fx.db, fx.actor, { bookingId, method: "cash", amount: "1000.00", status: "success" })).paymentId;
     expect(m((await fx.db("v_booking_balance").where({ booking_id: bookingId }).first("advance_held")).advance_held)).toBe(100_000n);
 
     const free = await freeRoomsForBooking(fx.db, fx.actor, bookingId);
@@ -108,7 +108,7 @@ describe("D-E server-generated references", () => {
     record("D-E", "10 parallel booking creates", "10 unique, consecutive BK- references", "booking sequence row lock (service); uq_bookings_reference backstop");
 
     const bookingId = b.ok[0]!;
-    const p = settle(await parallel(10, () => recordPayment(fx.db, fx.actor, { bookingId, method: "card", amount: "100.00", status: "success" })));
+    const p = settle(await parallel(10, async () => (await recordPayment(fx.db, fx.actor, { bookingId, method: "card", amount: "100.00", status: "success" })).paymentId));
     expect(p.refused).toEqual([]);
     const pnums = ((await fx.db("payments").whereIn("id", p.ok).pluck("reference")) as string[]).map((r) => Number(r.split("-")[1]));
     expect(new Set(pnums).size).toBe(10);
@@ -120,7 +120,7 @@ describe("duplicate-submit protection", () => {
   it("5 parallel submits of one payment with the same key record it once", async () => {
     const bookingId = await newBooking();
     const key = `pay-${fx.tag}-1`;
-    const { ok, refused } = settle(await parallel(5, () => recordPayment(fx.db, fx.actor, { bookingId, method: "cash", amount: "500.00", status: "success", idempotencyKey: key })));
+    const { ok, refused } = settle(await parallel(5, async () => (await recordPayment(fx.db, fx.actor, { bookingId, method: "cash", amount: "500.00", status: "success", idempotencyKey: key })).paymentId));
     expect(refused).toEqual([]);
     expect(new Set(ok).size).toBe(1);
     expect(await fx.db("payments").where({ booking_id: bookingId }).count({ n: "*" }).first()).toEqual({ n: 1 });

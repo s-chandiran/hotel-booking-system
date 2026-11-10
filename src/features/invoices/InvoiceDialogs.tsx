@@ -6,6 +6,7 @@ import { useIsAdmin } from "@/features/rooms/RoomDialogs";
 import { inr } from "@/components/app/DataTable";
 import { StatusBadge, type Tone } from "@/components/app/StatusBadge";
 import type { Invoice } from "@/types/modules";
+import { isStaydeskDesktop } from "@/lib/desktop";
 
 const payTone: Record<Invoice["status"], [Tone, string]> = {
   paid: ["success", "Paid"],
@@ -53,7 +54,28 @@ export function InvoiceActions({ invoice }: { invoice: Invoice }) {
 
 function InvoiceDetailDialog({ invoiceId, onClose }: { invoiceId: string; onClose: () => void }) {
   const q = useQuery(invoiceDetailQuery(invoiceId));
+  const [printError, setPrintError] = useState<string | null>(null);
+  const [printing, setPrinting] = useState(false);
   const d = q.data;
+  const amountPaid = d ? (d.amountPaid ?? Math.max(0, d.amount - d.balanceDue)) : 0;
+
+  async function onPrint() {
+    if (!isStaydeskDesktop() || !window.staydesk) {
+      // Browser fallback: open the authorized print route (same session cookie).
+      window.open(`/invoices/print/${encodeURIComponent(invoiceId)}`, "_blank", "noopener,noreferrer");
+      return;
+    }
+    setPrinting(true);
+    setPrintError(null);
+    try {
+      await window.staydesk.printInvoice({ invoiceId });
+    } catch (err) {
+      setPrintError(err instanceof Error ? err.message : "Print failed");
+    } finally {
+      setPrinting(false);
+    }
+  }
+
   return (
     <DialogShell title={d ? d.number : "Invoice"} onClose={onClose}>
       {q.isLoading ? <p className="text-sm text-muted-foreground">Loading…</p> : null}
@@ -107,17 +129,27 @@ function InvoiceDetailDialog({ invoiceId, onClose }: { invoiceId: string; onClos
               <span>{inr(d.tax)}</span>
             </div>
             <div className="flex justify-between font-semibold">
-              <span>Gross</span>
+              <span>Total</span>
               <span>{inr(d.amount)}</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-muted-foreground">Balance due</span>
+              <span className="text-muted-foreground">Amount paid</span>
+              <span>{d.documentStatus === "void" ? "—" : inr(amountPaid)}</span>
+            </div>
+            <div className="flex justify-between font-semibold">
+              <span>Balance due</span>
               <span>{d.documentStatus === "void" ? "—" : inr(d.balanceDue)}</span>
             </div>
           </div>
-          <button type="button" className={primaryBtn} onClick={onClose}>
-            Close
-          </button>
+          {printError ? <p className="text-xs text-destructive">{printError}</p> : null}
+          <div className="flex flex-wrap gap-2">
+            <button type="button" className={primaryBtn} onClick={onClose}>
+              Close
+            </button>
+            <button type="button" className={outlineBtn} onClick={() => void onPrint()} disabled={printing}>
+              {printing ? "Printing…" : "Print / PDF"}
+            </button>
+          </div>
         </div>
       ) : null}
     </DialogShell>

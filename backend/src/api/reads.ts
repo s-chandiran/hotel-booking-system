@@ -15,6 +15,7 @@ import type { Knex } from "knex";
 import { businessDate } from "../domain/dates.js";
 import { percentOf, sum, toMinor, fromMinor } from "../domain/money.js";
 import { freeRoomsForBooking } from "../services/bookings.js";
+import { onPaymentPaid } from "./events.js";
 import { isAtLeast, requireRole } from "./auth.js";
 import { HttpError, idParam, num, route } from "./http.js";
 
@@ -192,10 +193,45 @@ export function readRoutes(db: Knex): Router {
     const rows = await db("guests as g")
       .leftJoin("bookings as b", (j) => j.on("b.guest_id", "g.id").andOnIn("b.status", ["checked_in", "checked_out"]))
       .where("g.property_id", pid(req))
-      .groupBy("g.id", "g.full_name", "g.email", "g.phone", "g.country_code", "g.is_vip")
+      .groupBy(
+        "g.id",
+        "g.full_name",
+        "g.email",
+        "g.phone",
+        "g.country_code",
+        "g.is_vip",
+        "g.id_document_type",
+        "g.id_document_number_last4",
+      )
       .orderBy("g.full_name")
-      .select("g.id", "g.full_name", "g.email", "g.phone", "g.country_code", "g.is_vip", db.raw("COUNT(b.id) AS stays"), db.raw("MAX(b.check_out_date) AS last_stay"));
-    res.json(rows.map((g) => ({ id: String(g.id), name: g.full_name, email: g.email ?? "", phone: g.phone ?? "", country: country(g.country_code), countryCode: g.country_code ?? "", stays: Number(g.stays), lastStay: g.last_stay ?? "", vip: !!g.is_vip })));
+      .select(
+        "g.id",
+        "g.full_name",
+        "g.email",
+        "g.phone",
+        "g.country_code",
+        "g.is_vip",
+        "g.id_document_type",
+        "g.id_document_number_last4",
+        db.raw("COUNT(b.id) AS stays"),
+        db.raw("MAX(b.check_out_date) AS last_stay"),
+      );
+    res.json(
+      rows.map((g) => ({
+        id: String(g.id),
+        name: g.full_name,
+        email: g.email ?? "",
+        phone: g.phone ?? "",
+        country: country(g.country_code),
+        countryCode: g.country_code ?? "",
+        stays: Number(g.stays),
+        lastStay: g.last_stay ?? "",
+        vip: !!g.is_vip,
+        idDocumentType: (g.id_document_type as string | null) ?? null,
+        // Masked only — full ID number is never returned on the list.
+        idDocumentNumberMasked: g.id_document_number_last4 ? `••••${g.id_document_number_last4}` : "",
+      })),
+    );
   }));
 
   r.get("/front-desk", route(async (req, res) => {
@@ -206,8 +242,24 @@ export function readRoutes(db: Knex): Router {
 
   r.get("/invoices", route(async (req, res) => {
     const rows = await db("v_invoice_balance as v").join("bookings as b", "b.id", "v.booking_id").join("guests as g", "g.id", "b.guest_id").where("v.property_id", pid(req)).orderBy("v.invoice_number", "desc")
-      .select("v.invoice_id", "v.invoice_number", "g.full_name", "b.reference", "v.issue_date", "v.gross_amount", "v.tax_amount", "v.payment_status", "v.balance_due");
-    res.json(rows.map((i) => ({ id: String(i.invoice_id), number: i.invoice_number, guestName: i.full_name, reference: i.reference, issued: i.issue_date, amount: num(i.gross_amount), tax: num(i.tax_amount), status: i.payment_status, balanceDue: num(i.balance_due) })));
+      .select("v.invoice_id", "v.invoice_number", "g.full_name", "b.reference", "v.issue_date", "v.gross_amount", "v.tax_amount", "v.payment_status", "v.balance_due", "v.allocated_amount");
+    res.json(rows.map((i) => {
+      const amount = num(i.gross_amount);
+      const balanceDue = num(i.balance_due);
+      const amountPaid = num(i.allocated_amount);
+      return {
+        id: String(i.invoice_id),
+        number: i.invoice_number,
+        guestName: i.full_name,
+        reference: i.reference,
+        issued: i.issue_date,
+        amount,
+        tax: num(i.tax_amount),
+        status: i.payment_status,
+        balanceDue,
+        amountPaid,
+      };
+    }));
   }));
 
   /** Invoice detail with immutable lines and tax snapshot. Issued amounts are never editable. */
@@ -220,7 +272,7 @@ export function readRoutes(db: Knex): Router {
       .where({ "v.property_id": pid(req), "v.invoice_id": id })
       .first(
         "v.invoice_id", "v.invoice_number", "i.invoice_type", "i.status as document_status", "i.void_reason",
-        "g.full_name", "b.reference", "v.issue_date", "i.net_amount", "v.tax_amount", "v.gross_amount", "v.payment_status", "v.balance_due",
+        "g.full_name", "b.reference", "v.issue_date", "i.net_amount", "v.tax_amount", "v.gross_amount", "v.payment_status", "v.balance_due", "v.allocated_amount",
       );
     if (!row) throw new HttpError(404, "INVOICE_NOT_FOUND", "Invoice not found");
     const lines = await db("invoice_lines").where({ invoice_id: id }).orderBy("line_no")
@@ -239,6 +291,7 @@ export function readRoutes(db: Knex): Router {
       net: num(row.net_amount),
       tax: num(row.tax_amount),
       amount: num(row.gross_amount),
+      amountPaid: num(row.allocated_amount),
       status: row.payment_status,
       balanceDue: num(row.balance_due),
       lines: lines.map((l) => ({
@@ -339,6 +392,34 @@ export function readRoutes(db: Knex): Router {
       staff: staff.map((s) => ({ id: String(s.id), name: s.full_name, email: s.email ?? "", role: s.job_title ?? "", loginRole: s.login_role ?? null, active: !!s.is_active })),
     });
   }));
+
+  /**
+   * Server-Sent Events for desktop full-payment notifications.
+   * Auth is the normal Bearer JWT (BFF cookie → Authorization). No business logic in Electron main.
+   */
+  r.get("/events", (req, res) => {
+    res.setHeader("Content-Type", "text/event-stream; charset=utf-8");
+    res.setHeader("Cache-Control", "no-store, no-cache");
+    res.setHeader("Connection", "keep-alive");
+    res.setHeader("X-Accel-Buffering", "no");
+    res.flushHeaders?.();
+    res.write(`: connected\n\n`);
+
+    const send = (event: { invoiceId: string; invoiceNumber: string; guestName: string; bookingReference: string }) => {
+      res.write(`event: paymentPaid\ndata: ${JSON.stringify(event)}\n\n`);
+    };
+    const unsubscribe = onPaymentPaid(send);
+    const heartbeat = setInterval(() => {
+      res.write(`: ping\n\n`);
+    }, 15_000);
+
+    const cleanup = () => {
+      clearInterval(heartbeat);
+      unsubscribe();
+    };
+    req.on("close", cleanup);
+    req.on("aborted", cleanup);
+  });
 
   return r;
 }

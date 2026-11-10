@@ -36,13 +36,13 @@ async function successPayment(amount = "1000.00"): Promise<number> {
     source: "direct",
     status: "confirmed",
   });
-  return recordPayment(fx.db, fx.actor, {
+  return (await recordPayment(fx.db, fx.actor, {
     bookingId,
     method: "cash",
     amount,
     status: "success",
     idempotencyKey: key(),
-  });
+  })).paymentId;
 }
 
 describe("refunds", () => {

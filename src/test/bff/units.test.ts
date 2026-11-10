@@ -193,6 +193,7 @@ describe("proxy allowlist", () => {
     ["POST", "/api/rooms/12/housekeeping"],
     ["POST", "/api/rooms/12/remove"],
     ["POST", "/api/demo/clear"],
+    ["GET", "/api/events"],
   ])("allows %s %s", (method, path) => {
     expect(isAllowed(method, path)).toBe(true);
   });

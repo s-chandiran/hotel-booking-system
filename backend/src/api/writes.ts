@@ -9,6 +9,7 @@ import { Router } from "express";
 import type { Knex } from "knex";
 import { z } from "zod";
 import { cancelBooking, checkIn, checkOut, confirmBooking, createBooking, updateBooking } from "../services/bookings.js";
+import { publishPaymentPaid } from "./events.js";
 import { completeRefund, recordPayment, rejectRefund, requestRefund, voidInvoice } from "../services/finance.js";
 import { createGuest, updateGuest } from "../services/guests.js";
 import { createRoom, removeRoom, setHousekeeping, setMaintenance, updateRoom } from "../services/rooms.js";
@@ -23,11 +24,15 @@ const id = z.union([z.number().int().positive(), z.string().regex(/^[1-9]\d{0,17
 const idempotencyKey = z.string().regex(/^[A-Za-z0-9_-]{8,64}$/, "must be 8–64 letters, digits, - or _");
 const money = z.string().regex(/^\d{1,10}(\.\d{1,2})?$/, "must be a decimal amount like 1500.00").refine((s) => Number(s) > 0, "must be positive");
 
+const idDocumentType = z.enum(["aadhaar", "passport", "driving_licence"]);
+
 const guestBody = z.object({
   fullName: z.string().trim().min(1).max(160),
   email: z.string().trim().email().max(254).optional().nullable(),
   phone: z.string().trim().max(40).optional().nullable(),
   countryCode: z.string().trim().regex(/^[A-Za-z]{2}$/).optional().nullable(),
+  idDocumentType: idDocumentType.optional().nullable(),
+  idDocumentNumber: z.string().trim().min(4).max(64).optional().nullable(),
 }).strict();
 
 const bookingBody = z.object({
@@ -46,6 +51,8 @@ const guestPatch = z.object({
   email: z.string().trim().email().max(254).optional().nullable().or(z.literal("")),
   phone: z.string().trim().max(40).optional().nullable(),
   countryCode: z.string().trim().regex(/^[A-Za-z]{2}$/).optional().nullable().or(z.literal("")),
+  idDocumentType: idDocumentType.optional().nullable(),
+  idDocumentNumber: z.string().trim().min(4).max(64).optional().nullable().or(z.literal("")),
 }).strict().refine((b) => Object.keys(b).length > 0, "no changes were provided");
 
 const bookingPatch = z.object({
@@ -77,7 +84,14 @@ export function writeRoutes(db: Knex): Router {
 
   r.post("/guests", route(async (req, res) => {
     const b = parse(guestBody, req.body);
-    const guestId = await createGuest(db, req.actor!, { fullName: b.fullName, email: b.email ?? null, phone: b.phone ?? null, countryCode: b.countryCode ?? null });
+    const guestId = await createGuest(db, req.actor!, {
+      fullName: b.fullName,
+      email: b.email ?? null,
+      phone: b.phone ?? null,
+      countryCode: b.countryCode ?? null,
+      idDocumentType: b.idDocumentType ?? null,
+      idDocumentNumber: b.idDocumentNumber ?? null,
+    });
     res.status(201).json({ id: String(guestId) });
   }));
 
@@ -87,6 +101,8 @@ export function writeRoutes(db: Knex): Router {
     await updateGuest(db, req.actor!, guestId, {
       ...(b.fullName !== undefined ? { fullName: b.fullName } : {}), ...(b.email !== undefined ? { email: b.email || null } : {}),
       ...(b.phone !== undefined ? { phone: b.phone } : {}), ...(b.countryCode !== undefined ? { countryCode: b.countryCode || null } : {}),
+      ...(b.idDocumentType !== undefined ? { idDocumentType: b.idDocumentType } : {}),
+      ...(b.idDocumentNumber !== undefined ? { idDocumentNumber: b.idDocumentNumber || null } : {}),
     });
     res.json({ id: String(guestId) });
   }));
@@ -138,6 +154,14 @@ export function writeRoutes(db: Knex): Router {
     parse(emptyBody, req.body ?? {});
     const bookingId = idParam(req);
     const out = await checkOut(db, req.actor!, { bookingId });
+    for (const invPaid of out.newlyPaidInvoices) {
+      publishPaymentPaid({
+        invoiceId: String(invPaid.invoiceId),
+        invoiceNumber: invPaid.invoiceNumber,
+        guestName: invPaid.guestName,
+        bookingReference: invPaid.bookingReference,
+      });
+    }
     const inv = out.invoiceId ? await db("v_invoice_balance").where({ invoice_id: out.invoiceId }).first("gross_amount", "balance_due") : null;
     res.json({ id: String(bookingId), status: "checked_out", invoice: out.invoiceId ? { id: String(out.invoiceId), number: out.invoiceNumber, amount: num(inv?.gross_amount), balanceDue: num(inv?.balance_due) } : null });
   }));
@@ -178,10 +202,19 @@ export function writeRoutes(db: Knex): Router {
   r.post("/payments", route(async (req, res) => {
     const b = parse(paymentBody, req.body);
     // Ownership is checked by the service (the booking must belong to the caller's property).
-    const paymentId = await recordPayment(db, req.actor!, { bookingId: b.bookingId, method: b.method, amount: b.amount, status: "success", idempotencyKey: b.idempotencyKey });
-    const row = await db("payments").where({ id: paymentId }).first("reference", "amount");
+    const result = await recordPayment(db, req.actor!, { bookingId: b.bookingId, method: b.method, amount: b.amount, status: "success", idempotencyKey: b.idempotencyKey });
+    // Publish only after the payment transaction has committed (recordPayment awaits inTx).
+    for (const inv of result.newlyPaidInvoices) {
+      publishPaymentPaid({
+        invoiceId: String(inv.invoiceId),
+        invoiceNumber: inv.invoiceNumber,
+        guestName: inv.guestName,
+        bookingReference: inv.bookingReference,
+      });
+    }
+    const row = await db("payments").where({ id: result.paymentId }).first("reference", "amount");
     if (!row) throw new HttpError(500, "INTERNAL", "Payment not found after recording");
-    res.status(201).json({ id: String(paymentId), reference: row.reference, amount: num(row.amount) });
+    res.status(201).json({ id: String(result.paymentId), reference: row.reference, amount: num(row.amount) });
   }));
 
   /** Admin-only controlled refunds (Q8/Q28). Amounts are never edited on the original payment. */

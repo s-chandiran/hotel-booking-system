@@ -35,8 +35,9 @@ function Page() {
         { header: "Issued", cell: (i) => i.issued },
         { header: "Status", cell: (i) => <StatusBadge tone={tone[i.status][0]}>{tone[i.status][1]}</StatusBadge> },
         { header: "Tax", align: "right", cell: (i) => inr(i.tax) },
+        { header: "Total", align: "right", cell: (i) => <span className="font-semibold">{inr(i.amount)}</span> },
+        { header: "Paid", align: "right", cell: (i) => (i.status === "void" ? "—" : inr(i.amountPaid ?? Math.max(0, i.amount - (i.balanceDue ?? 0)))) },
         { header: "Balance due", align: "right", cell: (i) => (i.status === "void" ? "—" : inr(i.balanceDue ?? 0)) },
-        { header: "Amount", align: "right", cell: (i) => <span className="font-semibold">{inr(i.amount)}</span> },
         { header: "", align: "right", cell: (i) => <InvoiceActions invoice={i} /> },
       ]} />
     </div>

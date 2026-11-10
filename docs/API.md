@@ -70,9 +70,10 @@ Shapes follow `src/types/dashboard.ts` and `src/types/modules.ts`, with these de
 | `GET /api/bookings/:id/free-rooms` | any | **New.** Rooms the booking can be checked in to (D-F) |
 | `GET /api/room-types` | any | **New.** `{ id, code, name, rate, capacity }`, for the booking form |
 | `GET /api/rooms` | any | Status is `available \| occupied \| maintenance`, derived. Adds `id` |
-| `GET /api/guests` | any | `stays` counts checked-in and checked-out bookings. `country` is the country name |
+| `GET /api/guests` | any | `stays` counts checked-in and checked-out bookings. `country` is the country name. Adds `idDocumentType` (`aadhaar \| passport \| driving_licence \| null`) and `idDocumentNumberMasked` (`••••` + last 4, or `""`). The full number is never returned |
+| `GET /api/events` | any | **New.** Server-Sent Events stream (`text/event-stream`) for the desktop app. Sends `: ping` every 15 s and `event: paymentPaid` with `{ invoiceId, invoiceNumber, guestName, bookingReference }` once, when an issued invoice first reaches a zero balance (after a payment or the checkout invoice). Delivery is once per invoice (audit action `payment_paid_notified`). In-process only and **not scoped by property or role** (single-property demo). Through the BFF the stream ends when the browser disconnects |
 | `GET /api/front-desk` | any | Today's arrivals and departures, with `balance` (invoice balance, or the estimate above) and `bookingStatus` |
-| `GET /api/invoices` | any | `status` is `paid \| unpaid \| partial \| void`. Adds `balanceDue` |
+| `GET /api/invoices` | any | `status` is `paid \| unpaid \| partial \| void`. Adds `balanceDue` and `amountPaid` (allocated amount). `GET /api/invoices/:id` also returns `amountPaid` |
 | `GET /api/payments` | any | `status` is the payment's own (`pending \| success \| failed`), never `refunded` (G9). Adds `refundedAmount`. `invoiceNumber` lists allocated invoices, or `Advance` (G10) |
 | `GET /api/reports` | admin | Last 6 months. **Revenue is invoiced net** of issued invoices, excluding tax, void invoices and advances (D-G). Occupancy is stayed room-nights ÷ (all rooms × days). ADR is revenue ÷ room-nights. These occupancy and ADR definitions are provisional (Q16, Q22) |
 | `GET /api/settings` | admin | `taxRate` is the sum of the room tax components in effect today. `taxComponents[]` is added (G11) |
@@ -81,7 +82,7 @@ Shapes follow `src/types/dashboard.ts` and `src/types/modules.ts`, with these de
 
 | Action | Endpoint | Body | Result and rules |
 |---|---|---|---|
-| Create guest | `POST /api/guests` | `{ fullName, email?, phone?, countryCode? }` | `201 { id }` |
+| Create guest | `POST /api/guests` | `{ fullName, email?, phone?, countryCode?, idDocumentType?, idDocumentNumber? }` | `201 { id }`. ID type and number (4–64 chars, spaces removed) must be given together or not at all (`INVALID_GUEST`). `PATCH /api/guests/:id` takes the same two fields. ID numbers never appear in audit details |
 | Create booking | `POST /api/bookings` | `{ guestId, roomTypeId, checkInDate, checkOutDate, guestsCount, source, expectedArrivalTime?, idempotencyKey }` | `201 { id, reference, status, total }`. Reference is generated (`BK-…`). Status is `pending`, or `confirmed` for `source: walk_in` (D-B). The room rate is the room type's rate at this moment (snapshot). No room is assigned (D-F) |
 | Confirm | `POST /api/bookings/:id/confirm` | `{}` | `pending → confirmed` |
 | Assign room and check in | `POST /api/bookings/:id/check-in` | `{ roomId }` | `confirmed → checked_in`. Refused when the room is the wrong type, out of service, occupied (`ROOM_OCCUPIED`) or held by another booking for those dates (`ROOM_UNAVAILABLE`) |

@@ -10,14 +10,19 @@ export interface Booking {
 export interface Room {
   id?: string; roomTypeId?: string; outOfService?: boolean; number: string; floor: number; type: string; status: RoomStatus; rate: number; capacity: number; housekeeping: "clean" | "dirty" | "inspecting";
 }
+export type IdDocumentType = "aadhaar" | "passport" | "driving_licence";
+
 export interface Guest {
   id: string; name: string; email: string; phone: string; country: string; countryCode?: string; stays: number; lastStay: string; vip: boolean;
+  idDocumentType?: IdDocumentType | null;
+  /** Masked ID only (e.g. ••••1234). Full number is never sent on list APIs. */
+  idDocumentNumberMasked?: string;
 }
 export interface FrontDeskItem {
   id: string; reference: string; guestName: string; roomNumber: string; kind: "arrival" | "departure"; time: string; status: "pending" | "done"; balance: number; bookingStatus?: BookingStatus;
 }
 export interface Invoice {
-  id: string; number: string; guestName: string; reference: string; issued: string; amount: number; tax: number; status: "paid" | "unpaid" | "partial" | "void"; balanceDue?: number;
+  id: string; number: string; guestName: string; reference: string; issued: string; amount: number; tax: number; status: "paid" | "unpaid" | "partial" | "void"; balanceDue?: number; amountPaid?: number;
 }
 export interface Payment {
   id: string; reference: string; invoiceNumber: string; guestName: string; date: string; method: "Card" | "UPI" | "Cash" | "Bank transfer"; amount: number; status: "success" | "pending" | "failed"; refundedAmount?: number;

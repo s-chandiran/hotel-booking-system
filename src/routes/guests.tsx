@@ -27,10 +27,11 @@ function Page() {
         <GuestDialog trigger={<button className={primaryBtn}>Add guest</button>} />
       </PageHeader>
       <StatRow items={[{ label: "Guests", value: data.length }, { label: "VIP", value: data.filter((g) => g.vip).length }, { label: "Repeat guests", value: data.filter((g) => g.stays > 1).length }, { label: "International", value: data.filter((g) => g.country !== "India").length }]} />
-      <DataTable rows={data} rowKey={(g) => g.id} searchText={(g) => `${g.name} ${g.email} ${g.phone}`} columns={[
+      <DataTable rows={data} rowKey={(g) => g.id} searchText={(g) => `${g.name} ${g.email} ${g.phone} ${g.idDocumentNumberMasked ?? ""}`} columns={[
         { header: "Name", cell: (g) => <span className="font-medium">{g.name} {g.vip && <StatusBadge tone="warning">VIP</StatusBadge>}</span> },
         { header: "Email", cell: (g) => <span className="text-muted-foreground">{g.email}</span> },
         { header: "Phone", cell: (g) => g.phone },
+        { header: "ID proof", cell: (g) => (g.idDocumentType ? <span className="text-muted-foreground">{g.idDocumentType.replace("_", " ")} {g.idDocumentNumberMasked}</span> : "—") },
         { header: "Country", cell: (g) => g.country },
         { header: "Stays", align: "right", cell: (g) => g.stays },
         { header: "Last stay", align: "right", cell: (g) => g.lastStay },

@@ -99,12 +99,14 @@ async function callUpstream(
   deps: BffDeps,
   config: BffConfig,
   path: string,
-  init: { method: string; body?: string | undefined; token?: string; slug?: boolean },
+  init: { method: string; body?: string | undefined; token?: string; slug?: boolean; stream?: boolean; clientSignal?: AbortSignal },
 ): Promise<Response | null> {
   // Fresh header set: nothing from the browser request (Authorization, Cookie, Host, X-Hotel-Slug…)
   // is forwarded. The destination is always config.upstream + an allowlisted path.
   const headers: Record<string, string> = {
-    accept: "application/json, application/pdf;q=0.9, text/csv;q=0.8",
+    accept: init.stream
+      ? "text/event-stream"
+      : "application/json, application/pdf;q=0.9, text/csv;q=0.8",
   };
   if (init.body !== undefined && init.body.length > 0) headers["content-type"] = "application/json";
   if (init.token) headers["authorization"] = `Bearer ${init.token}`;
@@ -114,7 +116,13 @@ async function callUpstream(
       method: init.method,
       headers,
       redirect: "manual",
-      signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS),
+      // SSE must not use the short JSON timeout. It is aborted when the browser disconnects, so the
+      // Express connection and its event listener are released instead of leaking.
+      ...(init.stream
+        ? init.clientSignal
+          ? { signal: init.clientSignal }
+          : {}
+        : { signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS) }),
     };
     if (init.body !== undefined && init.body.length > 0) reqInit.body = init.body;
     return await deps.fetch(`${config.upstream}${path}`, reqInit);
@@ -237,6 +245,8 @@ async function handleProxy(
   const token = readSession(request, config.secureCookie);
   if (!token) return errorResponse(401, "UNAUTHORIZED", SESSION_EXPIRED);
 
+  const stream = upstreamPath === "/api/events" && request.method.toUpperCase() === "GET";
+
   let body: string | undefined;
   if (isStateChanging(request.method)) {
     const read = await readBody(request);
@@ -249,6 +259,8 @@ async function handleProxy(
     method: request.method.toUpperCase(),
     body,
     token,
+    stream,
+    ...(stream ? { clientSignal: request.signal } : {}),
   });
   if (!upstream)
     return errorResponse(
@@ -263,6 +275,15 @@ async function handleProxy(
     return errorResponse(401, "UNAUTHORIZED", SESSION_EXPIRED, {
       "set-cookie": clearSession(config.secureCookie),
     });
+  }
+  if (stream) {
+    const headers: Record<string, string> = {
+      ...BASE_HEADERS,
+      "content-type": upstream.headers.get("content-type") || "text/event-stream; charset=utf-8",
+      "cache-control": "no-store, no-cache",
+      connection: "keep-alive",
+    };
+    return new Response(upstream.body, { status: upstream.status, headers });
   }
   return passThrough(upstream);
 }

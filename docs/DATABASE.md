@@ -558,6 +558,15 @@ recurrence as a runner problem first, but check the output.
 the compose `api` service, and the Gate 4 frontend work. Migration 011 (`balance_due` for void invoices), the Express API and auth,
 `docs/API.md`, and the `api` compose service.
 
+## 9e. Desktop demo migrations (014, 015)
+
+| Migration | Change | Note |
+|---|---|---|
+| 014 `guest_id_documents` | `guests.id_document_type` (`aadhaar`, `passport`, `driving_licence`, NULL), `id_document_number` VARCHAR(64) NULL, `id_document_number_last4` CHAR(4) NULL | The full number is stored **in plain text** (demo scope of Q19). List APIs return only the last 4 digits. Guests stay undeletable. Needs a customer decision before production: Indian rules restrict storing full Aadhaar numbers, and backups copy this column |
+| 015 `guest_id_grants` | `GRANT UPDATE` on the three new columns to the app user | Forward-only extension of 010's column-level UPDATE grants |
+
+The "invoice fully paid" notification marker is an `audit_events` row (`entity_type=invoice`, `action=payment_paid_notified`), not a new column. Invoices that were already paid before this feature existed have no such row, so they may notify once on the next payment or checkout for the same booking.
+
 ## 9. Not in this design (waiting for open questions)
 
 Multi-room bookings (Q2), seasonal rates and extras (Q5), credit notes (Q11e), guest credit and

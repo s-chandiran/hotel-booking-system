@@ -137,3 +137,17 @@
 - Booking-status changes are **service-only** apart from the occupancy unique key (T2b, DATABASE.md
   §9c). Check-in of a non-overlapping booking into a still-occupied room is caught only by that key
   (raw `ER_DUP_ENTRY`).
+
+## Desktop shell (`desktop/`, Electron)
+- Dev run: `cd desktop` then `npm install` then `npm start` (Docker Desktop must be running). It runs `docker compose up -d`
+  from the repo root, waits for API `:5000/health` and web `:3000`, loads `/login`, and runs `docker compose stop` on quit
+  (never `down -v`). If the stack is already healthy it is reused, and still stopped on quit.
+- **Dev only.** The packaged NSIS build (`npm run dist`) is not usable yet: it bundles only `docker-compose.yml` and `.env.example`
+  (no build contexts, no `.env`) and the compose project name would differ from the repo's, so it would not see the MySQL volume.
+- Host data: `C:\ProgramData\StayDesk\{documents,backups,logs,config}`; documents are bind-mounted into `web` and `api`
+  (`STAYDESK_DOCUMENTS`, default `./.staydesk-data/documents`).
+- Preload bridge `window.staydesk` (`desktop/preload.cjs`, `src/lib/desktop.ts`): version, `printInvoice`, backup/restore, `notifyPaymentPaid`.
+- Payment-paid notifications: Express `/api/events` (SSE, `backend/src/api/events.ts`) → BFF stream (`handler.ts`, aborted with the
+  browser request) → `usePaymentPaidEvents` → Electron notification. Not scoped by property. Once per invoice via audit `payment_paid_notified`.
+- Migrations 014 and 015 add guest ID document columns and grants. Open questions Q30 (ID storage) and Q31 (backup roles) block production.
+- Docs: `docs/DESKTOP_OPERATOR.md`, `docs/screens/{guests,settings,invoice-print}.md`.

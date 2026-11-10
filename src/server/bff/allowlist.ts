@@ -41,6 +41,8 @@ export const ALLOWED_ROUTES: readonly Rule[] = [
   r("GET", "/api/settings"),
   r("PATCH", "/api/settings"),
   r("POST", "/api/demo/clear"),
+  // Desktop SSE: full-payment notifications (Express → BFF → React → Electron IPC).
+  r("GET", "/api/events"),
 
   r("POST", "/api/guests"),
   r("PATCH", "/api/guests/:seg"),

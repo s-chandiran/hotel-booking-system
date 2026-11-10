@@ -141,11 +141,24 @@ async function replayPayment(db: Db, actor: Actor, input: RecordPaymentInput): P
   return prior.id as number;
 }
 
+export interface RecordPaymentResult {
+  paymentId: number;
+  /** Invoices that reached a zero open balance in this committed payment (one-shot notify). */
+  newlyPaidInvoices: NewlyPaidInvoice[];
+}
+
+export interface NewlyPaidInvoice {
+  invoiceId: number;
+  invoiceNumber: string;
+  guestName: string;
+  bookingReference: string;
+}
+
 /** Money received for a booking, possibly before any invoice exists (an advance, Q23). */
-export async function recordPayment(db: Db, actor: Actor, input: RecordPaymentInput): Promise<number> {
+export async function recordPayment(db: Db, actor: Actor, input: RecordPaymentInput): Promise<RecordPaymentResult> {
   if (input.idempotencyKey) {
     const prior = await replayPayment(db, actor, input);
-    if (prior !== null) return prior;
+    if (prior !== null) return { paymentId: prior, newlyPaidInvoices: [] };
   }
   try {
     return await insertPayment(db, actor, input);
@@ -153,13 +166,44 @@ export async function recordPayment(db: Db, actor: Actor, input: RecordPaymentIn
     // A concurrent request with the same key won the race: return its payment.
     if (input.idempotencyKey && isDuplicateOn(e, "uq_payments_idempotency")) {
       const prior = await replayPayment(db, actor, input);
-      if (prior !== null) return prior;
+      if (prior !== null) return { paymentId: prior, newlyPaidInvoices: [] };
     }
     throw e;
   }
 }
 
-function insertPayment(db: Db, actor: Actor, input: RecordPaymentInput): Promise<number> {
+/**
+ * After allocation, mark issued invoices with zero open balance as notified exactly once
+ * (audit action payment_paid_notified) so desktop SSE does not duplicate.
+ */
+async function collectNewlyPaidInvoices(trx: Trx, actor: Actor, bookingId: number, invoices: InvoiceRow[]): Promise<NewlyPaidInvoice[]> {
+  const newly: NewlyPaidInvoice[] = [];
+  for (const inv of invoices) {
+    if (inv.status !== "issued") continue;
+    const open = await invoiceOpen(trx, inv);
+    if (open > 0n) continue;
+    const prior = await trx("audit_events")
+      .where({ property_id: actor.propertyId, entity_type: "invoice", entity_id: inv.id, action: "payment_paid_notified" })
+      .first("id");
+    if (prior) continue;
+    const meta = await trx("invoices as i")
+      .join("bookings as b", "b.id", "i.booking_id")
+      .join("guests as g", "g.id", "b.guest_id")
+      .where("i.id", inv.id)
+      .first("i.invoice_number", "g.full_name", "b.reference");
+    if (!meta) continue;
+    await audit(trx, actor, { entityType: "invoice", entityId: inv.id, action: "payment_paid_notified", toState: "paid", details: { booking_id: bookingId } });
+    newly.push({
+      invoiceId: inv.id,
+      invoiceNumber: String(meta.invoice_number),
+      guestName: String(meta.full_name),
+      bookingReference: String(meta.reference),
+    });
+  }
+  return newly;
+}
+
+function insertPayment(db: Db, actor: Actor, input: RecordPaymentInput): Promise<RecordPaymentResult> {
   return inTx(db, async (trx) => {
     const { payments, invoices } = await lockBookingGraph(trx, actor, input.bookingId);
     const amount = toMinor(input.amount);
@@ -172,11 +216,13 @@ function insertPayment(db: Db, actor: Actor, input: RecordPaymentInput): Promise
       }),
     );
     await audit(trx, actor, { entityType: "payment", entityId: id, action: "record", toState: input.status, details: { booking_id: input.bookingId, amount: fromMinor(amount), method: input.method } });
+    let newlyPaidInvoices: NewlyPaidInvoice[] = [];
     if (input.status === "success") {
       const p: PaymentRow = { id, booking_id: input.bookingId, amount: fromMinor(amount), status: "success", method: input.method };
       await autoAllocate(trx, actor, [...payments, p], invoices);
+      newlyPaidInvoices = await collectNewlyPaidInvoices(trx, actor, input.bookingId, invoices);
     }
-    return id;
+    return { paymentId: id, newlyPaidInvoices };
   });
 }
 
@@ -217,7 +263,11 @@ interface TaxComponentRow { id: number; code: string; name: string; rate_percent
  *  - penalty invoice: booking cancelled (Q13)
  *  - every tax component in effect applies to the invoice net, rounded per component (Q6)
  */
-export function issueInvoice(db: Db, actor: Actor, input: IssueInvoiceInput): Promise<{ invoiceId: number; invoiceNumber: string }> {
+export function issueInvoice(
+  db: Db,
+  actor: Actor,
+  input: IssueInvoiceInput,
+): Promise<{ invoiceId: number; invoiceNumber: string; newlyPaidInvoices: NewlyPaidInvoice[] }> {
   return inTx(db, async (trx) => {
     const { booking, payments, invoices } = await lockBookingGraph(trx, actor, input.bookingId);
     const category = input.invoiceType === "stay" ? "room" : "penalty";
@@ -272,8 +322,10 @@ export function issueInvoice(db: Db, actor: Actor, input: IssueInvoiceInput): Pr
     await audit(trx, actor, { entityType: "invoice", entityId: invoiceId, action: "issue", toState: "issued", details: { booking_id: booking.id, invoice_number: invoiceNumber, gross: fromMinor(net + tax) } });
 
     const created: InvoiceRow = { id: invoiceId, booking_id: booking.id, status: "issued", gross_amount: fromMinor(net + tax), invoice_type: input.invoiceType };
-    await autoAllocate(trx, actor, payments, [...invoices, created]);
-    return { invoiceId, invoiceNumber };
+    const allInvoices = [...invoices, created];
+    await autoAllocate(trx, actor, payments, allInvoices);
+    const newlyPaidInvoices = await collectNewlyPaidInvoices(trx, actor, booking.id, allInvoices);
+    return { invoiceId, invoiceNumber, newlyPaidInvoices };
   });
 }
 

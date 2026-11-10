@@ -30,5 +30,7 @@ export function Note({ tone, children }: { tone: "success" | "warning"; children
   return <p role="status" className={`rounded-lg border px-3 py-2 text-sm ${cls}`}>{children}</p>;
 }
 
-export const todayIso = (): string => new Date().toLocaleDateString("en-CA");
+/** Business “today” in Indian Standard Time (property timezone for the India demo). */
+export const todayIso = (timeZone = "Asia/Kolkata"): string =>
+  new Date().toLocaleDateString("en-CA", { timeZone });
 export const addDaysIso = (iso: string, n: number): string => new Date(Date.parse(`${iso}T00:00:00Z`) + n * 86_400_000).toISOString().slice(0, 10);

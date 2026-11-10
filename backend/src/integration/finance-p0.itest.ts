@@ -14,8 +14,8 @@ const ISSUE_DATE = "2026-11-09";
 const invoice = (bookingId: number, type: "stay" | "penalty" = "stay", unitPrice = "1000.00", description = "Room night"): IssueInvoiceInput => ({
   bookingId, invoiceType: type, issueDate: ISSUE_DATE, series: fx.series, lines: [{ description, quantity: "1", unitPrice }],
 });
-const pay = (bookingId: number, amount: string, status: "success" | "pending" = "success") =>
-  recordPayment(fx.db, fx.actor, { bookingId, reference: fx.ref("P"), method: "card", amount, status });
+const pay = async (bookingId: number, amount: string, status: "success" | "pending" = "success") =>
+  (await recordPayment(fx.db, fx.actor, { bookingId, reference: fx.ref("P"), method: "card", amount, status })).paymentId;
 const refund = (paymentId: number, amount: string) => requestRefund(fx.db, fx.actor, { paymentId, reference: fx.ref("R"), amount, reason: "integration test" });
 
 const nextValue = async (): Promise<number> =>

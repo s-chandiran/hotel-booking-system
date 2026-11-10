@@ -39,9 +39,27 @@ export const bookingDetailQuery = (id: string) =>
 export const freeRoomsQuery = (id: string) =>
   queryOptions({ queryKey: ["booking", id, "free-rooms"], queryFn: ({ signal }) => apiRequest<FreeRoom[]>(`/api/bookings/${encodeURIComponent(id)}/free-rooms`, { signal }), staleTime: 0 });
 
-export const createGuest = (b: { fullName: string; email?: string; phone?: string; countryCode?: string }) => post<{ id: string }>("/api/guests", b);
-export const updateGuest = (id: string, b: { fullName?: string; email?: string; phone?: string; countryCode?: string }) =>
-  apiRequest<{ id: string }>(`/api/guests/${encodeURIComponent(id)}`, { method: "PATCH", body: JSON.stringify(b) });
+export type IdDocumentType = "aadhaar" | "passport" | "driving_licence";
+
+export const createGuest = (b: {
+  fullName: string;
+  email?: string;
+  phone?: string;
+  countryCode?: string;
+  idDocumentType?: IdDocumentType;
+  idDocumentNumber?: string;
+}) => post<{ id: string }>("/api/guests", b);
+export const updateGuest = (
+  id: string,
+  b: {
+    fullName?: string;
+    email?: string;
+    phone?: string;
+    countryCode?: string;
+    idDocumentType?: IdDocumentType | null;
+    idDocumentNumber?: string | null;
+  },
+) => apiRequest<{ id: string }>(`/api/guests/${encodeURIComponent(id)}`, { method: "PATCH", body: JSON.stringify(b) });
 export const createBooking = (b: { guestId: string; roomTypeId: string; checkInDate: string; checkOutDate: string; guestsCount: number; source: BookingSource; idempotencyKey: string }) =>
   post<{ id: string; reference: string; status: string; total: number }>("/api/bookings", b);
 export const createRoom = (b: { number: string; roomTypeId: string; floor?: number }) => post<{ id: string }>("/api/rooms", b);
@@ -100,6 +118,7 @@ export interface InvoiceDetail {
   net: number;
   tax: number;
   amount: number;
+  amountPaid?: number;
   status: "paid" | "unpaid" | "partial" | "void";
   balanceDue: number;
   lines: { lineNo: number; description: string; quantity: number; unitPrice: number; lineNet: number }[];

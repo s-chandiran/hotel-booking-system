@@ -23,6 +23,18 @@ npm i
 npm run dev
 ```
 
+## Windows desktop demo (Electron)
+
+Offline single-PC packaging lives in [`desktop/`](desktop/). Electron starts the existing Docker Compose stack and opens the UI in a desktop window. Operator steps: [`docs/DESKTOP_OPERATOR.md`](docs/DESKTOP_OPERATOR.md).
+
+```bat
+cd desktop
+npm install
+npm start
+```
+
+Docker Desktop must be running. Images must already be built/pulled for a true offline demo. Quit never removes the MySQL volume.
+
 ## Docker (client demo)
 
 Start **Docker Desktop**, then from the repo root:

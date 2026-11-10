@@ -9,6 +9,9 @@ lerna-debug.log*
 
 node_modules
 dist
+.staydesk-data/
+desktop/node_modules/
+desktop/dist/
 
 # Secrets (database and demo passwords). Only .env.example is committed.
 .env

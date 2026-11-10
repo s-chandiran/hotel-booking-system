@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>StayDesk</title>
+    <style>
+      html,
+      body {
+        margin: 0;
+        height: 100%;
+        font-family: "Segoe UI", system-ui, sans-serif;
+        background: #0f172a;
+        color: #e2e8f0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      .box {
+        text-align: center;
+        max-width: 28rem;
+        padding: 2rem;
+      }
+      h1 {
+        font-size: 1.75rem;
+        margin: 0 0 0.5rem;
+        letter-spacing: 0.04em;
+      }
+      p {
+        margin: 0.5rem 0 0;
+        color: #94a3b8;
+        font-size: 0.95rem;
+        line-height: 1.45;
+        white-space: pre-wrap;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="box">
+      <h1>StayDesk</h1>
+      <p id="status">Starting local services…</p>
+    </div>
+    <script>
+      window.staydeskSplash = {
+        setStatus(text) {
+          document.getElementById("status").textContent = text || "";
+        },
+      };
+    </script>
+  </body>
+</html>

@@ -7,11 +7,12 @@
 | Reservations | `/bookings` | [reservations.md](reservations.md) | live API, with the demo actions |
 | Front Desk | `/front-desk` | [reservations.md](reservations.md) | live API, with the demo actions |
 | Rooms | `/rooms` | TBD | live API |
-| Guests | `/guests` | TBD | live API |
+| Guests | `/guests` | [guests.md](guests.md) | live API |
 | Invoices | `/invoices` | TBD | live API, read only |
 | Payments | `/payments` | TBD | live API (record payment via booking Manage) |
 | Reports | `/reports` | TBD | live API, admin only (server-side 403 otherwise) |
-| Settings | `/settings` | TBD | live API, admin only (server-side 403 otherwise) |
+| Settings | `/settings` | [settings.md](settings.md) | live API, admin only (server-side 403 otherwise) |
+| Print invoice | `/invoices/print/:invoiceId` | [invoice-print.md](invoice-print.md) | live API, loaded only by the desktop app |
 
 ## Shared navigation and session model
 
